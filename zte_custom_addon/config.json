@@ -7,5 +7,6 @@
   "startup": "application",
   "boot": "auto",
   "options": {},
-  "schema": {}
+  "schema": {},
+  "image": "homeassistant/amd64-addon-base:latest"
 }
