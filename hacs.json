@@ -1,9 +1,0 @@
-{
-    "name": "ZTE MC Series Router Integration",
-    "content_in_root": false,
-    "domains": ["integration"],
-    "country": "US",
-    "homeassistant": "2021.11.0",
-    "persistent_directory": "custom_components",
-    "zip_release": false
-}
