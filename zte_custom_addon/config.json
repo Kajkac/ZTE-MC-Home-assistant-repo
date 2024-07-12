@@ -1,13 +1,11 @@
 {
-    "name": "ZTE Custom Addon",
-    "version": "1.0.0",
-    "slug": "zte_custom_addon",
-    "description": "An add-on to deploy the ZTE Router custom integration",
-    "arch": ["armhf", "armv7", "aarch64", "amd64", "i386"],
-    "startup": "application",
-    "boot": "auto",
-    "options": {},
-    "schema": {},
-    "image": "local/zte_custom_addon"
-  }
-  
+  "name": "ZTE Custom Addon",
+  "version": "1.0.0",
+  "slug": "zte_custom_addon",
+  "description": "An add-on to deploy the ZTE Router custom integration",
+  "arch": ["armhf", "armv7", "aarch64", "amd64", "i386"],
+  "startup": "application",
+  "boot": "auto",
+  "options": {},
+  "schema": {}
+}
