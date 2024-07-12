@@ -1,0 +1,21 @@
+{
+  "name": "ZTE Custom Addon",
+  "version": "1.0",
+  "slug": "zte_custom_addon",
+  "description": "Addon to copy custom ZTE integration",
+  "startup": "application",
+  "boot": "auto",
+  "options": {},
+  "schema": {},
+  "arch": [
+      "armhf",
+      "armv7",
+      "aarch64",
+      "amd64",
+      "i386"
+  ],
+  "host_network": false,
+  "map": [
+      "config:rw"
+  ]
+}
