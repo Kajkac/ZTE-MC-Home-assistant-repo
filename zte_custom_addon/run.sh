@@ -2,8 +2,8 @@
 set -e
 
 # Copy custom components to Home Assistant configuration directory
-mkdir -p /config/custom_components/your_custom_component
-cp -r /custom_components/your_custom_component/* /config/custom_components/your_custom_component/
+mkdir -p /config/custom_components/zte_router
+cp -r /custom_components/zte_router/* /config/custom_components/zte_router/
 
 # Log the deployment
-echo "My custom integration has been deployed!"
+echo "ZTE Router custom integration has been deployed!"
