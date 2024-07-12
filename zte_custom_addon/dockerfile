@@ -1,4 +1,5 @@
-FROM homeassistant/amd64-addon-base:latest
+ARG BUILD_FROM
+FROM $BUILD_FROM
 
 ENV LANG C.UTF-8
 
