@@ -25,12 +25,14 @@ Find integration ZTE Router
 
 Enter Router IP , password and select the model you have and waitz for integration to install all the device sensors
 
-Bugs: 
+## Bugs: 
 
 1. Username currently not supported
 2. Errors in Home assistant log are for now present until i polish the addon 
-3. Any sugestion you have please open the bug 
-4. If u wanna donate for beer let me know :P 
+2. There are errors for sure but whoever wanna test it let me know
+4. Any sugestion you have please open the bug 
+5. I will push new builds as soon i will have more time
+6. If u wanna donate for beer let me know :P 
 
 ## HACS installation
 
