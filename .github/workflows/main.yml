@@ -1,4 +1,4 @@
-name: Increment Version and Release
+name: Create Release
 
 on:
   push:
@@ -20,17 +20,8 @@ jobs:
         echo "VERSION=${VERSION}" >> $GITHUB_ENV
         echo "Current version: ${VERSION}"
 
-    - name: Increment version
-      id: increment_version
-      run: |
-        IFS='.' read -r major minor patch <<< "${{ env.VERSION }}"
-        NEW_VERSION="${major}.${minor}.$((patch + 1))"
-        echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_ENV
-        jq --arg new_version "$NEW_VERSION" '.version = $new_version' custom_components/zte_router/manifest.json > temp.json && mv temp.json custom_components/zte_router/manifest.json
-        echo "New version: ${NEW_VERSION}"
-
-    - name: Display updated version
-      run: echo "New version is ${{ env.NEW_VERSION }}"
+    - name: Display current version
+      run: echo "VERSION=${{ env.VERSION }}"
 
     - name: Zip files
       run: zip -r zte_router.zip custom_components/zte_router
@@ -48,8 +39,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.PAT }}
       with:
-        tag_name: v${{ env.NEW_VERSION }}
-        release_name: ZTE_MC_HA_CI_v${{ env.NEW_VERSION }}
+        tag_name: v${{ env.VERSION }}
+        release_name: ZTE_MC_HA_CI_v${{ env.VERSION }}
         body: |
           Changes in this release:
           - ${{ env.LAST_COMMIT_MESSAGE }}
