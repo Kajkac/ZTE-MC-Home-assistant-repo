@@ -1,7 +1,4 @@
-[
-    {
-      "name": "ZTE Custom Add-on Repository",
-      "url": "https://github.com/Kajkac/ZTE-MC-Home-assistant-repo"
-    }
-  ]
-  
+{
+  "name": "ZTE Home Assistant Add-ons",
+  "url": "https://github.com/Kajkac/ZTE-MC-Home-assistant-repo"
+}
