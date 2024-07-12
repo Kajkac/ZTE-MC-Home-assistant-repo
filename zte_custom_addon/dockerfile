@@ -1,10 +1,27 @@
-# Use build arguments to specify the architecture
-ARG BUILD_FROM
-FROM ${BUILD_FROM}
+# Set a default architecture if not provided
+ARG BUILD_ARCH=amd64
 
+# Define base images for different architectures
+FROM homeassistant/amd64-base:latest as amd64_base
+FROM homeassistant/armhf-base:latest as armhf_base
+FROM homeassistant/armv7-base:latest as armv7_base
+FROM homeassistant/aarch64-base:latest as aarch64_base
+FROM homeassistant/i386-base:latest as i386_base
+
+# Choose the correct base image based on the architecture
+FROM amd64_base AS final
+ARG BUILD_ARCH
+RUN if [ "${BUILD_ARCH}" = "armhf" ]; then FROM armhf_base AS final; \
+    elif [ "${BUILD_ARCH}" = "armv7" ]; then FROM armv7_base AS final; \
+    elif [ "${BUILD_ARCH}" = "aarch64" ]; then FROM aarch64_base AS final; \
+    elif [ "${BUILD_ARCH}" = "i386" ]; then FROM i386_base AS final; fi
+
+# Set environment variables
 ENV LANG C.UTF-8
 
+# Copy the run script
 COPY run.sh /run.sh
-RUN chmod a+x /run.sh
+RUN chmod +x /run.sh
 
+# Define the default command
 CMD [ "/run.sh" ]
