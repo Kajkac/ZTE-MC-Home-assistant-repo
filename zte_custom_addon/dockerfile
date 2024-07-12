@@ -1,27 +1,13 @@
-# Set a default architecture if not provided
-ARG BUILD_ARCH=amd64
+FROM homeassistant/amd64-base:latest
 
-# Define base images for different architectures
-FROM homeassistant/amd64-base:latest as amd64_base
-FROM homeassistant/armhf-base:latest as armhf_base
-FROM homeassistant/armv7-base:latest as armv7_base
-FROM homeassistant/aarch64-base:latest as aarch64_base
-FROM homeassistant/i386-base:latest as i386_base
+# Download and install s6-overlay
+ADD https://github.com/just-containers/s6-overlay/releases/download/v2.2.0.3/s6-overlay-amd64.tar.gz /tmp/
+RUN tar xzf /tmp/s6-overlay-amd64.tar.gz -C / && \
+    rm /tmp/s6-overlay-amd64.tar.gz
 
-# Choose the correct base image based on the architecture
-FROM amd64_base AS final
-ARG BUILD_ARCH
-RUN if [ "${BUILD_ARCH}" = "armhf" ]; then FROM armhf_base AS final; \
-    elif [ "${BUILD_ARCH}" = "armv7" ]; then FROM armv7_base AS final; \
-    elif [ "${BUILD_ARCH}" = "aarch64" ]; then FROM aarch64_base AS final; \
-    elif [ "${BUILD_ARCH}" = "i386" ]; then FROM i386_base AS final; fi
+# Copy your custom files
+COPY run.sh /etc/cont-init.d/01-run.sh
+RUN chmod +x /etc/cont-init.d/01-run.sh
 
-# Set environment variables
-ENV LANG C.UTF-8
-
-# Copy the run script
-COPY run.sh /run.sh
-RUN chmod +x /run.sh
-
-# Define the default command
-CMD [ "/run.sh" ]
+# Use the s6-overlay init system
+ENTRYPOINT ["/init"]
