@@ -1,3 +1,5 @@
+ZTE-MC-Home-assistant-repo
+
 # Home Assistant Custom Add-on
 
 This repository contains a custom integration and an add-on for Home Assistant.
