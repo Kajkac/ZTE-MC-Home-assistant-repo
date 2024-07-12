@@ -8,7 +8,6 @@
   "boot": "auto",
   "options": {},
   "schema": {},
-  "image": "local/zte_custom_addon",
   "build_from": {
     "armhf": "homeassistant/armhf-base:latest",
     "armv7": "homeassistant/armv7-base:latest",
