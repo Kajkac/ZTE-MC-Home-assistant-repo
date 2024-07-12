@@ -1,19 +1,20 @@
 {
-  "name": "ZTE Home Assistant Add-ons",
-  "url": "https://github.com/Kajkac/ZTE-MC-Home-assistant-repo",
-  "maintainer": "Kajkac",
-  "description": "This repository contains Home Assistant add-ons for managing ZTE routers.",
-  "add-ons": [
-    {
-      "name": "ZTE Custom Addon",
-      "slug": "zte_custom_addon",
-      "description": "An add-on to deploy the ZTE Router custom integration.",
-      "url": "https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/zte_custom_addon",
-      "arch": ["armhf", "armv7", "aarch64", "amd64", "i386"],
-      "startup": "application",
-      "boot": "auto",
-      "options": {},
-      "schema": {}
-    }
-  ]
+    "name": "ZTE-MC-Home-assistant-repo",
+    "url": "https://github.com/Kajkac/ZTE-MC-Home-assistant-repo",
+    "maintainer": "Kajkac",
+    "add-ons": [
+        {
+            "name": "My Custom Addon",
+            "slug": "my_custom_addon",
+            "description": "This add-on installs my custom integration.",
+            "repository": "https://github.com/Kajkac/ZTE-MC-Home-assistant-repo",
+            "version": "1.0",
+            "arch": ["aarch64", "amd64", "armhf", "armv7", "i386"],
+            "startup": "application",
+            "boot": "auto",
+            "options": {},
+            "schema": {},
+            "image": "local/my_custom_addon"
+        }
+    ]
 }

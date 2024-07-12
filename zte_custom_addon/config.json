@@ -1,8 +1,8 @@
 {
-  "name": "ZTE Custom Addon",
+  "name": "My Custom Addon",
   "version": "1.0",
   "slug": "zte_custom_addon",
-  "description": "An add-on to deploy the ZTE Router custom integration",
+  "description": "This add-on installs my custom integration.",
   "startup": "application",
   "boot": "auto",
   "options": {},
@@ -14,6 +14,9 @@
     "armv7",
     "i386"
   ],
+  "host_network": true,
+  "host_ipc": true,
+  "host_dbus": true,
   "privileged": [
     "SYS_ADMIN"
   ],
