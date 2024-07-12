@@ -1,4 +1,6 @@
-FROM homeassistant/amd64-addon-base:latest
+# Use build arguments to specify the architecture
+ARG BUILD_FROM
+FROM ${BUILD_FROM}
 
 ENV LANG C.UTF-8
 
