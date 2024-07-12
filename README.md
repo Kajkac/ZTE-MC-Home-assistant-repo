@@ -1,4 +1,13 @@
-# Home Assistant ZTE Add-on
+# ZTE Home assistant addon
+**ZTE Home assistant addon**
+
+Supported models : 
+
+```
+MC801A
+MC889
+MC888
+```
 
 This repository contains the ZTE Router custom integration and an add-on to deploy it in Home Assistant.
 
@@ -6,20 +15,19 @@ This repository contains the ZTE Router custom integration and an add-on to depl
 
 The custom integration is located in the `custom_components/zte_router` directory.
 
-## Add-on
-
-The add-on is located in the `zte_custom_addon` directory.
-
 ## Installation
 
-1. Add this repository to Home Assistant:
-   - Go to Home Assistant > Supervisor > Add-on Store > Repositories.
-   - Add the URL of this repository: `https://github.com/Kajkac/ZTE-MC-Home-assistant-repo`.
+Manual installation
+Copy the custom_components/zte_router of this repo into the path /config/custom_components/zte_router of your HA installation.
 
-2. Install the add-on:
-   - Find the add-on in the Add-on Store.
-   - Install and start the add-on.
+Restart Home Assistant go to Settings -> integrations -> Add integration 
+Find integration ZTE Router 
 
-## Usage
+Enter Router IP , password and select the model you have and waitz for integration to install all the device sensors
 
-This add-on will deploy the ZTE Router custom integration to your Home Assistant configuration.
+Bugs: 
+
+1. Username currently not supported
+2. Errors in Home assistant log are for now present until i polish the addon 
+3. Any sugestion you have please open the bug 
+4. If u wanna donate for beer let me know :P 
