@@ -36,7 +36,7 @@ jobs:
 
     - name: Get last commit message
       id: last_commit
-      run: echo "::set-output name=message::$(git log -1 --pretty=format:'%s')"
+      run: echo "message=$(git log -1 --pretty=format:'%s')" >> $GITHUB_ENV
 
     - name: Create Release
       id: create_release
@@ -48,7 +48,7 @@ jobs:
         release_name: ZTE_MC_HA_CI_v${{ env.VERSION }}
         body: |
           Changes in this release:
-          - ${{ steps.last_commit.outputs.message }}
+          - ${{ env.message }}
 
     - name: Upload Release Asset
       id: upload-release-asset
