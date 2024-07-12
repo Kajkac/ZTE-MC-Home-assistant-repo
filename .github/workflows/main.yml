@@ -36,25 +36,25 @@ jobs:
 
     - name: Get last commit message
       id: last_commit
-      run: echo "message=$(git log -1 --pretty=format:'%s')" >> $GITHUB_ENV
+      run: echo "LAST_COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')" >> $GITHUB_ENV
 
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PAT }}
       with:
         tag_name: v${{ env.VERSION }}
         release_name: ZTE_MC_HA_CI_v${{ env.VERSION }}
         body: |
           Changes in this release:
-          - ${{ env.message }}
+          - ${{ env.LAST_COMMIT_MESSAGE }}
 
     - name: Upload Release Asset
       id: upload-release-asset
       uses: actions/upload-release-asset@v1
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.PAT }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./zte_router.zip
