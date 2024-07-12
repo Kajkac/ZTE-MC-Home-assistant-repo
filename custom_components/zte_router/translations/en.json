@@ -7,7 +7,7 @@
                 "data": {
                     "router_ip": "Router IP",
                     "router_password": "Router Password",
-                    "router_username": "Router Username",
+                    "router_username": "Router Username (in development!)",
                     "ping_interval": "Ping Interval (seconds)",
                     "sms_check_interval": "SMS Check Interval (seconds)"
                 }
