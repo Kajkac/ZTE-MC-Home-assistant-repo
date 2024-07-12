@@ -9,6 +9,8 @@ MC889
 MC888
 ```
 
+![alt tag](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/blob/master/zte.png?raw=true?)
+
 This repository contains the ZTE Router custom integration and an add-on to deploy it in Home Assistant.
 
 ## Custom Integration
