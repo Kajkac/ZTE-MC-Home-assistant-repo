@@ -17,5 +17,9 @@
   "host_network": false,
   "map": [
       "config:rw"
-  ]
+  ],
+  "command": "/bin/bash /run.sh",
+  "hassio_api": true,
+  "hassio_role": "default",
+  "homeassistant_api": true
 }
