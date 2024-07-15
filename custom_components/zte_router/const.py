@@ -266,3 +266,28 @@ UNITS = {
     "sms_sim_sent_total": None,
     "sms_sim_draftbox_total": None
 }
+# Define which sensors should be disabled by default
+DISABLED_SENSORS = {
+    "concat_sms_received": True,
+    "concat_sms_total": True,
+    "content": True,
+    "cr_version": True,
+    "date": True,
+    "id": True,
+    "is_mandatory": True,
+    "is_night_mode": True,
+    "lte_ca_scell_arfcn": True,
+    "lte_earfcn_lock": True,
+    "lte_pci_lock": True,
+    "sms_nv_draftbox_total": True,
+    "sms_sim_total": True,
+    "sms_class": True,
+    "sms_dev_unread_num": True,
+    "sms_nv_rev_total": True,
+    "sms_nv_send_total": True,
+    "sms_sim_rev_total": True,
+    "sms_sim_send_total": True,
+    "sms_sim_unread_num": True,
+    "tag": True
+    # Add other sensors here to disable by default
+}

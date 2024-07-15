@@ -1,7 +1,10 @@
 import logging
+import yaml
+import os
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import async_get as async_get_device_registry
+from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
 from homeassistant.components.http import HomeAssistantView
 from .const import DOMAIN, MANUFACTURER, MODEL
 from .sensor import ZTERouterDataUpdateCoordinator, ZTERouterSMSUpdateCoordinator
@@ -52,9 +55,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     # Register the device in the device registry
     device_registry = async_get_device_registry(hass)
+    entity_registry = async_get_entity_registry(hass)
     ip_address = entry.data.get('router_ip')
     unique_id = f"{DOMAIN}_{ip_address}"
-    device_registry.async_get_or_create(
+    device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, unique_id)},
         manufacturer=MANUFACTURER,
@@ -64,7 +68,79 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         sw_version=firmware_version,
     )
 
-    return True
+    # Find the entity_id for a specific sensor, e.g., "sensor.last_sms"
+    sensor_entity_id = None
+    switch_entity_id = "switch.send_sms_50gb"
+
+    for entity in entity_registry.entities.values():
+        if entity.device_id == device.id and entity.platform == DOMAIN:
+            if entity.original_name == "Last SMS":
+                sensor_entity_id = entity.entity_id
+
+    if not sensor_entity_id:
+        _LOGGER.error("Could not find the necessary entities for automation.")
+        return False
+
+    # Define the automation configuration with dynamic device_id and entity_id
+    automation_config = {
+        "id": f"{DOMAIN}_automatic_sms_sender_{entry.entry_id}",
+        "alias": "Automatic SMS Sender T-Mobile HR",
+        "trigger": [
+            {
+                "platform": "state",
+                "entity_id": sensor_entity_id,
+                "to": "Za nastavak surfanja po maksimalnoj dostupnoj brzini posaljite rijec BRZINA na broj 13909. Vas Hrvatski Telekom"
+            }
+        ],
+        "condition": [
+            {
+                "condition": "state",
+                "entity_id": sensor_entity_id,
+                "state": "Za nastavak surfanja po maksimalnoj dostupnoj brzini posaljite rijec BRZINA na broj 13909. Vas Hrvatski Telekom"
+            }
+        ],
+        "action": [
+            {
+                "service": "switch.turn_on",
+                "target": {
+                    "entity_id": switch_entity_id
+                }
+            }
+        ],
+        "mode": "single"
+    }
+
+    def write_automation():
+        automations_file = hass.config.path("automations.yaml")
+        try:
+            if os.path.exists(automations_file):
+                with open(automations_file, 'r') as file:
+                    automations = yaml.safe_load(file) or []
+            else:
+                automations = []
+
+            # Remove any existing automation with the same ID
+            automations = [a for a in automations if a.get("id") != automation_config["id"]]
+
+            automations.append(automation_config)
+
+            with open(automations_file, 'w') as file:
+                yaml.dump(automations, file, default_flow_style=False)
+
+            return True
+
+        except Exception as e:
+            _LOGGER.error(f"Failed to write automation: {e}")
+            return False
+
+    success = await hass.async_add_executor_job(write_automation)
+    if success:
+        # Reload automations
+        await hass.services.async_call("automation", "reload")
+        _LOGGER.info("Automation 'Automatic SMS Sender T-Mobile HR' created successfully")
+        return True
+    else:
+        return False
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Unload a config entry."""

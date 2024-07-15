@@ -8,7 +8,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
-from .const import DOMAIN, SENSOR_NAMES, MANUFACTURER, MODEL, UNITS
+from .const import DOMAIN, SENSOR_NAMES, MANUFACTURER, MODEL, UNITS, DISABLED_SENSORS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +30,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     sensors = []
     for key in coordinator.data.keys():
         name = SENSOR_NAMES.get(key, key)  # Get the friendly name or default to key
+        if DISABLED_SENSORS.get(key, False):
+            _LOGGER.debug(f"Sensor {key} ({name}) is disabled by default.")
         sensors.append(ZTERouterSensor(coordinator, name, key))
 
     # Add new dynamic set of sensors
@@ -40,6 +42,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     dynamic_data = json.loads(dynamic_data)
     for key in dynamic_data.keys():
         name = SENSOR_NAMES.get(key, key)
+        if DISABLED_SENSORS.get(key, False):
+            _LOGGER.debug(f"Sensor {key} ({name}) is disabled by default.")
         sensors.append(ZTERouterSensor(coordinator, name, key))
 
     # Add the new sensor for command 6
@@ -50,6 +54,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     additional_data = json.loads(additional_data)
     for key in additional_data.keys():
         name = SENSOR_NAMES.get(key, key)
+        if DISABLED_SENSORS.get(key, False):
+            _LOGGER.debug(f"Sensor {key} ({name}) is disabled by default.")
         sensors.append(ZTERouterSensor(coordinator, name, key))
 
     # Add the new sensor for Last SMS
@@ -148,6 +154,7 @@ class ZTERouterSensor(Entity):
         self._name = name
         self._key = key
         self._state = None
+        self.entity_registry_enabled_default = not DISABLED_SENSORS.get(key, False)  # Set to False if the sensor should be hidden
 
     @property
     def name(self):
@@ -199,6 +206,7 @@ class LastSMSSensor(Entity):
         self._name = "Last SMS"
         self._state = sms_data.get("content")
         self._attributes = {k: v for k, v in sms_data.items() if k != "content"}
+        self.entity_registry_enabled_default = not DISABLED_SENSORS.get("last_sms", False)  # Check if the sensor should be hidden
 
         # Parse and format the date attribute
         if "date" in self._attributes:
@@ -248,7 +256,7 @@ class LastSMSSensor(Entity):
         data = self.coordinator.data.get("last_sms")
         if data:
             self._state = data.get("content")
-            self._attributes = {k: v for k, v in data.items() if k != "content"}
+            self._attributes = {k: v for k, v in data.items if k != "content"}
             if "date" in self._attributes:
                 self._attributes["formatted_date"] = self.format_date(self._attributes["date"])
             self.async_write_ha_state()
@@ -290,9 +298,11 @@ def format_ca_bands(ca_bands, nr5g_action_band):
     for band in ca_bands_list:
         band_info = band.split(",")
         if len(band_info) >= 6:
-            ca_bands_formatted.append(f"B{band_info[1]}(@{band_info[5]}Mhz)")
+            band_id = band_info[3]  # Use the appropriate index for the band identifier
+            bandwidth = band_info[5]
+            ca_bands_formatted.append(f"B{band_id}(@{bandwidth}Mhz)")
     if nr5g_action_band:
-        ca_bands_formatted.append(f"n{nr5g_action_band}")
+        ca_bands_formatted.append(f"{nr5g_action_band}")
     return "+".join(ca_bands_formatted)
 
 class ConnectedBandsSensor(Entity):
@@ -301,6 +311,7 @@ class ConnectedBandsSensor(Entity):
         self._name = "Connected Bands"
         self._state = None
         self._attributes = {}
+        self.entity_registry_enabled_default = not DISABLED_SENSORS.get("connected_bands", False)  # Check if the sensor should be hidden
 
     @property
     def name(self):
@@ -354,7 +365,11 @@ class ConnectedBandsSensor(Entity):
         ca_bands_formatted = format_ca_bands(ca_bands, data.get("nr5g_action_band", ""))
 
         # Calculate enbid
-        enb_id = int(cell_id) // 256 if cell_id else ""
+        try:
+            enb_id = int(cell_id, 16) // 256 if cell_id else ""
+        except ValueError:
+            _LOGGER.error(f"Invalid cell_id for conversion to int: {cell_id}")
+            enb_id = ""
 
         self._state = f"MAIN:B{main_band}(@{main_bandwidth}Mhz) CA:{ca_bands_formatted}"
         self._attributes = {
@@ -374,6 +389,7 @@ class MonthlyUsageSensor(Entity):
         self.coordinator = coordinator
         self._name = "Monthly Usage"
         self._state = None
+        self.entity_registry_enabled_default = not DISABLED_SENSORS.get("monthly_usage", False)  # Check if the sensor should be hidden
 
     @property
     def name(self):
@@ -428,6 +444,7 @@ class DataLeftSensor(Entity):
         self.coordinator = coordinator
         self._name = "Data Left"
         self._state = None
+        self.entity_registry_enabled_default = not DISABLED_SENSORS.get("data_left", False)  # Check if the sensor should be hidden
 
     @property
     def name(self):
@@ -480,6 +497,7 @@ class ConnectionUptimeSensor(Entity):
         self.coordinator = coordinator
         self._name = "Connection Uptime"
         self._state = None
+        self.entity_registry_enabled_default = not DISABLED_SENSORS.get("connection_uptime", False)  # Check if the sensor should be hidden
 
     @property
     def name(self):
