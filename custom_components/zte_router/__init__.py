@@ -119,8 +119,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             else:
                 automations = []
 
-            # Remove any existing automation with the same ID
-            automations = [a for a in automations if a.get("id") != automation_config["id"]]
+            # Check for existing automation with the same alias or ID
+            for automation in automations:
+                if automation.get("alias") == "Automatic SMS Sender T-Mobile HR" or automation.get("id") == automation_config["id"]:
+                    _LOGGER.info("Automation 'Automatic SMS Sender T-Mobile HR' already exists. Skipping creation.")
+                    return False
 
             automations.append(automation_config)
 
