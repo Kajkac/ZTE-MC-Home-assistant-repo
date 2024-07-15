@@ -110,6 +110,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         "mode": "single"
     }
 
+    def automation_exists():
+        automations_file = hass.config.path("automations.yaml")
+        try:
+            if os.path.exists(automations_file):
+                with open(automations_file, 'r') as file:
+                    automations = yaml.safe_load(file) or []
+                for automation in automations:
+                    if automation.get("alias") == "Automatic SMS Sender T-Mobile HR":
+                        return True
+            return False
+        except Exception as e:
+            _LOGGER.error(f"Failed to read automation file: {e}")
+            return False
+
     def write_automation():
         automations_file = hass.config.path("automations.yaml")
         try:
@@ -119,11 +133,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             else:
                 automations = []
 
-            # Check for existing automation with the same alias or ID
-            for automation in automations:
-                if automation.get("alias") == "Automatic SMS Sender T-Mobile HR" or automation.get("id") == automation_config["id"]:
-                    _LOGGER.info("Automation 'Automatic SMS Sender T-Mobile HR' already exists. Skipping creation.")
-                    return False
+            # Remove any existing automation with the same ID
+            automations = [a for a in automations if a.get("id") != automation_config["id"]]
 
             automations.append(automation_config)
 
@@ -136,14 +147,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             _LOGGER.error(f"Failed to write automation: {e}")
             return False
 
-    success = await hass.async_add_executor_job(write_automation)
-    if success:
-        # Reload automations
-        await hass.services.async_call("automation", "reload")
-        _LOGGER.info("Automation 'Automatic SMS Sender T-Mobile HR' created successfully")
-        return True
+    if not await hass.async_add_executor_job(automation_exists):
+        success = await hass.async_add_executor_job(write_automation)
+        if success:
+            # Reload automations
+            await hass.services.async_call("automation", "reload")
+            _LOGGER.info("Automation 'Automatic SMS Sender T-Mobile HR' created successfully")
+        else:
+            return False
     else:
-        return False
+        _LOGGER.info("Automation 'Automatic SMS Sender T-Mobile HR' already exists")
+
+    return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Unload a config entry."""
