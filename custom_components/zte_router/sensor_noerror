@@ -92,9 +92,8 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(f"Data received from mc.py script: {data}")
             return json.loads(data)
         except Exception as err:
-            _LOGGER.warning(f"Error communicating with router: {err}")
-            _LOGGER.warning(f"Error fetching zte_router data: {err}")
-            raise UpdateFailed(f"Error communicating with router: {err}")
+            _LOGGER.info(f"Router not available: {err}")
+            return {}
 
     def run_mc_script(self, ip, password, command):
         try:
@@ -107,7 +106,7 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(f"Output for command {command}: {result.stdout}")
             return result.stdout
         except subprocess.CalledProcessError as e:
-            _LOGGER.warning(f"Error running mc.py script for command {command}: {e}")
+            _LOGGER.info(f"Router not available: {e}")
             raise
 
 class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
@@ -130,9 +129,8 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(f"SMS data received from mc.py script: {data}")
             return json.loads(data)
         except Exception as err:
-            _LOGGER.warning(f"Error communicating with router for SMS data: {err}")
-            _LOGGER.warning(f"Error fetching zte_router_sms data: {err}")
-            raise UpdateFailed(f"Error communicating with router for SMS data: {err}")
+            _LOGGER.info(f"Router not available: {err}")
+            return {}
 
     def run_mc_script(self, ip, password, command):
         try:
@@ -145,7 +143,7 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(f"Output for SMS command {command}: {result.stdout}")
             return result.stdout
         except subprocess.CalledProcessError as e:
-            _LOGGER.warning(f"Error running mc.py script for SMS command {command}: {e}")
+            _LOGGER.info(f"Router not available: {e}")
             raise
 
 class ZTERouterSensor(Entity):
