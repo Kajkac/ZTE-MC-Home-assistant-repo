@@ -185,7 +185,21 @@ class zteRouter:
         }
 
         response = s.get(cmd_url, headers=headers, verify=False)
-        return response.text
+        
+        # Parse the response JSON
+        data = json.loads(response.text)
+        
+        # Calculate sms_capacity_left
+        sms_nv_total = int(data.get("sms_nv_total", 0))
+        sms_nv_rev_total = int(data.get("sms_nv_rev_total", 0))
+        sms_nv_send_total = int(data.get("sms_nv_send_total", 0))
+        sms_capacity_left = sms_nv_total - sms_nv_rev_total - sms_nv_send_total
+        
+        # Add the new key-value pair
+        data["sms_capacity_left"] = str(sms_capacity_left)
+        
+        # Return the modified JSON as a string
+        return json.dumps(data)
 
     def ztereboot(self):
         cookie = self.getCookie(password=self.password, LD=self.get_LD())
@@ -314,8 +328,10 @@ if __name__ == "__main__":
         result = zte.connect_data()
     elif command == 10:
         result = zte.disconnect_data()
-    
     if result and command != 6:
         print(result)
+
+
+
 
 

@@ -40,6 +40,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     )
     _LOGGER.debug(f"Data for command 3: {dynamic_data}")
     dynamic_data = json.loads(dynamic_data)
+    coordinator._data.update(dynamic_data)  # Update coordinator's data with dynamic data
     for key in dynamic_data.keys():
         name = SENSOR_NAMES.get(key, key)
         if DISABLED_SENSORS.get(key, False):
@@ -52,6 +53,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     )
     _LOGGER.debug(f"Data for command 6: {additional_data}")
     additional_data = json.loads(additional_data)
+    coordinator._data.update(additional_data)  # Update coordinator's data with additional data
     for key in additional_data.keys():
         name = SENSOR_NAMES.get(key, key)
         if DISABLED_SENSORS.get(key, False):
@@ -91,7 +93,7 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
                 self.run_mc_script, self.ip_entry, self.password_entry, 7
             )
             _LOGGER.debug(f"Data received from mc.py script: {data}")
-            self._data = json.loads(data)
+            self._data.update(json.loads(data))
             return self._data
         except Exception as err:
             _LOGGER.info(f"Router not available: {err}")
@@ -130,7 +132,7 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
                 self.run_mc_script, self.ip_entry, self.password_entry, 6
             )
             _LOGGER.debug(f"SMS data received from mc.py script: {data}")
-            self._data = json.loads(data)
+            self._data.update(json.loads(data))
             return self._data
         except Exception as err:
             _LOGGER.info(f"Router not available: {err}")
