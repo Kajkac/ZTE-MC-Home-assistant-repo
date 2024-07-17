@@ -76,13 +76,13 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(self, hass, ip_entry, password_entry, ping_interval):
         self.ip_entry = ip_entry
         self.password_entry = password_entry
+        self._data = {}
         super().__init__(
             hass,
             _LOGGER,
             name="zte_router",
             update_interval=timedelta(seconds=ping_interval),
         )
-        self._data = {}
 
     async def _async_update_data(self):
         try:
@@ -115,13 +115,13 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
     def __init__(self, hass, ip_entry, password_entry, sms_check_interval):
         self.ip_entry = ip_entry
         self.password_entry = password_entry
+        self._data = {}
         super().__init__(
             hass,
             _LOGGER,
             name="zte_router_sms",
             update_interval=timedelta(seconds=sms_check_interval),
         )
-        self._data = {}
 
     async def _async_update_data(self):
         try:
