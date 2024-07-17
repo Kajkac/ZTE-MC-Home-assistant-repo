@@ -82,6 +82,7 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
             name="zte_router",
             update_interval=timedelta(seconds=ping_interval),
         )
+        self._data = {}
 
     async def _async_update_data(self):
         try:
@@ -90,11 +91,11 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
                 self.run_mc_script, self.ip_entry, self.password_entry, 7
             )
             _LOGGER.debug(f"Data received from mc.py script: {data}")
-            return json.loads(data)
+            self._data = json.loads(data)
+            return self._data
         except Exception as err:
-            _LOGGER.warning(f"Error communicating with router: {err}")
-            _LOGGER.warning(f"Error fetching zte_router data: {err}")
-            raise UpdateFailed(f"Error communicating with router: {err}")
+            _LOGGER.info(f"Router not available: {err}")
+            return self._data
 
     def run_mc_script(self, ip, password, command):
         try:
@@ -107,7 +108,7 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(f"Output for command {command}: {result.stdout}")
             return result.stdout
         except subprocess.CalledProcessError as e:
-            _LOGGER.warning(f"Error running mc.py script for command {command}: {e}")
+            _LOGGER.info(f"Router not available: {e}")
             raise
 
 class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
@@ -120,6 +121,7 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
             name="zte_router_sms",
             update_interval=timedelta(seconds=sms_check_interval),
         )
+        self._data = {}
 
     async def _async_update_data(self):
         try:
@@ -128,11 +130,11 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
                 self.run_mc_script, self.ip_entry, self.password_entry, 6
             )
             _LOGGER.debug(f"SMS data received from mc.py script: {data}")
-            return json.loads(data)
+            self._data = json.loads(data)
+            return self._data
         except Exception as err:
-            _LOGGER.warning(f"Error communicating with router for SMS data: {err}")
-            _LOGGER.warning(f"Error fetching zte_router_sms data: {err}")
-            raise UpdateFailed(f"Error communicating with router for SMS data: {err}")
+            _LOGGER.info(f"Router not available: {err}")
+            return self._data
 
     def run_mc_script(self, ip, password, command):
         try:
@@ -145,7 +147,7 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(f"Output for SMS command {command}: {result.stdout}")
             return result.stdout
         except subprocess.CalledProcessError as e:
-            _LOGGER.warning(f"Error running mc.py script for SMS command {command}: {e}")
+            _LOGGER.info(f"Router not available: {e}")
             raise
 
 class ZTERouterSensor(Entity):
@@ -197,7 +199,8 @@ class ZTERouterSensor(Entity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
-        self._state = self.coordinator.data.get(self._key)
+        if self.coordinator.data:
+            self._state = self.coordinator.data.get(self._key, self._state)
         self.async_write_ha_state()
 
 class LastSMSSensor(Entity):
@@ -260,9 +263,6 @@ class LastSMSSensor(Entity):
             self._attributes = {k: v for k, v in data.items() if k != "content"}
             if "date" in self._attributes:
                 self._attributes["formatted_date"] = self.format_date(self._attributes["date"])
-        else:
-            self._state = "NO DATA"
-            self._attributes = {}
         self.async_write_ha_state()
 
     def format_date(self, date_str):
@@ -358,34 +358,35 @@ class ConnectedBandsSensor(Entity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
-        data = self.coordinator.data
-        rmcc = data.get("rmcc", "")
-        rmnc = data.get("rmnc", "")
-        cell_id = data.get("cell_id", "")
-        wan_ip = data.get("wan_ipaddr", "")
-        main_band = data.get("lte_ca_pcell_band", "")
-        main_bandwidth = data.get("lte_ca_pcell_bandwidth", "")
-        ca_bands = data.get("lte_multi_ca_scell_info", "")
-        ca_bands_formatted = format_ca_bands(ca_bands, data.get("nr5g_action_band", ""))
+        if self.coordinator.data:
+            data = self.coordinator.data
+            rmcc = data.get("rmcc", "")
+            rmnc = data.get("rmnc", "")
+            cell_id = data.get("cell_id", "")
+            wan_ip = data.get("wan_ipaddr", "")
+            main_band = data.get("lte_ca_pcell_band", "")
+            main_bandwidth = data.get("lte_ca_pcell_bandwidth", "")
+            ca_bands = data.get("lte_multi_ca_scell_info", "")
+            ca_bands_formatted = format_ca_bands(ca_bands, data.get("nr5g_action_band", ""))
 
-        # Calculate enbid
-        try:
-            enb_id = int(cell_id, 16) // 256 if cell_id else ""
-        except ValueError:
-            _LOGGER.error(f"Invalid cell_id for conversion to int: {cell_id}")
-            enb_id = ""
+            # Calculate enbid
+            try:
+                enb_id = int(cell_id, 16) // 256 if cell_id else ""
+            except ValueError:
+                _LOGGER.error(f"Invalid cell_id for conversion to int: {cell_id}")
+                enb_id = ""
 
-        self._state = f"MAIN:B{main_band}(@{main_bandwidth}Mhz) CA:{ca_bands_formatted}"
-        self._attributes = {
-            "rmcc": rmcc,
-            "rmnc": rmnc,
-            "cell_id": cell_id,
-            "wan_ip": wan_ip,
-            "main_band": main_band,
-            "main_bandwidth": main_bandwidth,
-            "ca_bands": ca_bands,
-            "enb_id": enb_id,
-        }
+            self._state = f"MAIN:B{main_band}(@{main_bandwidth}Mhz) CA:{ca_bands_formatted}"
+            self._attributes = {
+                "rmcc": rmcc,
+                "rmnc": rmnc,
+                "cell_id": cell_id,
+                "wan_ip": wan_ip,
+                "main_band": main_band,
+                "main_bandwidth": main_bandwidth,
+                "ca_bands": ca_bands,
+                "enb_id": enb_id,
+            }
         self.async_write_ha_state()
 
 class MonthlyUsageSensor(Entity):
@@ -436,11 +437,12 @@ class MonthlyUsageSensor(Entity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
-        data = self.coordinator.data
-        monthly_tx_bytes = float(data.get("monthly_tx_bytes", 0) or 0)
-        monthly_rx_bytes = float(data.get("monthly_rx_bytes", 0) or 0)
-        monthly_usage_gb = (monthly_tx_bytes + monthly_rx_bytes) / 1024 / 1024 / 1024
-        self._state = round(monthly_usage_gb, 2)
+        if self.coordinator.data:
+            data = self.coordinator.data
+            monthly_tx_bytes = float(data.get("monthly_tx_bytes", 0) or 0)
+            monthly_rx_bytes = float(data.get("monthly_rx_bytes", 0) or 0)
+            monthly_usage_gb = (monthly_tx_bytes + monthly_rx_bytes) / 1024 / 1024 / 1024
+            self._state = round(monthly_usage_gb, 2)
         self.async_write_ha_state()
 
 class DataLeftSensor(Entity):
@@ -491,9 +493,10 @@ class DataLeftSensor(Entity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
-        monthly_usage = float(self.hass.states.get("sensor.monthly_usage").state or 0)
-        data_left = 200 - monthly_usage if monthly_usage < 200 else 50 - (monthly_usage % 50)
-        self._state = round(data_left, 2)
+        if self.coordinator.data:
+            monthly_usage = float(self.hass.states.get("sensor.monthly_usage").state or 0)
+            data_left = 200 - monthly_usage if monthly_usage < 200 else 50 - (monthly_usage % 50)
+            self._state = round(data_left, 2)
         self.async_write_ha_state()
 
 class ConnectionUptimeSensor(Entity):
@@ -544,7 +547,8 @@ class ConnectionUptimeSensor(Entity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
-        realtime_time = float(self.coordinator.data.get("realtime_time", 0) or 0)
-        uptime_hours = realtime_time / 3600
-        self._state = round(uptime_hours, 2)
+        if self.coordinator.data:
+            realtime_time = float(self.coordinator.data.get("realtime_time", 0) or 0)
+            uptime_hours = realtime_time / 3600
+            self._state = round(uptime_hours, 2)
         self.async_write_ha_state()
