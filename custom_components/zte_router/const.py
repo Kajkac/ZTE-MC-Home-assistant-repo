@@ -127,10 +127,11 @@ SENSOR_NAMES = {
     "signalbar": "Signal Bar",
     "ppp_status": "PPP Status",
     # New SMS related sensors
-    "sms_nv_total": "SMS NV Total",
-    "sms_sim_total": "SMS SIM Total",
-    "sms_nv_received_total": "SMS NV Received Total",
-    "sms_nv_sent_total": "SMS NV Sent Total",
+    "sms_nv_total": "SMS Capacity device",
+    "sms_capacity_left": "SMS Capacity left",
+    "sms_sim_total": "SMS Capacity SIM",
+    "sms_nv_rev_total": "Recieved SMS-s",
+    "sms_nv_send_total": "Sent SMS-s",
     "sms_nv_draftbox_total": "SMS NV Draftbox Total",
     "sms_sim_received_total": "SMS SIM Received Total",
     "sms_sim_sent_total": "SMS SIM Sent Total",
@@ -283,11 +284,11 @@ DISABLED_SENSORS = {
     "sms_sim_total": True,
     "sms_class": True,
     "sms_dev_unread_num": True,
-    "sms_nv_rev_total": True,
-    "sms_nv_send_total": True,
     "sms_sim_rev_total": True,
     "sms_sim_send_total": True,
     "sms_sim_unread_num": True,
+    "sms_nv_received_total":True,
+    "sms_received_flag":True,
     "tag": True
     # Add other sensors here to disable by default
 }
