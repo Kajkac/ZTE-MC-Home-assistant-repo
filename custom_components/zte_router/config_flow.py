@@ -23,8 +23,8 @@ class ZTERouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required("router_ip"): str,
             vol.Required("router_password"): str,
             vol.Optional("router_username", default=DEFAULT_USERNAME): str,
-            vol.Optional("ping_interval", default=60): int,
-            vol.Optional("sms_check_interval", default=100): int,  # Add this line
+            vol.Optional("ping_interval", default=100): int,
+            vol.Optional("sms_check_interval", default=200): int,  # Add this line
             vol.Required("router_type", default="MC801A"): vol.In(["MC801A", "MC889", "MC888"]),
         })
 

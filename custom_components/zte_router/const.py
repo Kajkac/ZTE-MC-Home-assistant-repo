@@ -138,6 +138,15 @@ SENSOR_NAMES = {
     "sms_sim_draftbox_total": "SMS SIM Draftbox Total"
 }
 
+# Define which sensors should be included in the Diagnostics section
+DIAGNOSTICS_SENSORS = {
+    "sms_capacity_left",
+    "last_sms",
+    "signalbar",
+    "connected_bands",
+    # Add other sensors you want to include in Diagnostics
+}
+
 # Define units of measurement for the sensors
 UNITS = {
     "wa_inner_version": None,
@@ -267,8 +276,9 @@ UNITS = {
     "sms_sim_sent_total": None,
     "sms_sim_draftbox_total": None
 }
-# Define which sensors should be disabled by default
-DISABLED_SENSORS = {
+
+# Define which sensors should be disabled by default for each router type
+DISABLED_SENSORS_MC889 = {
     "concat_sms_received": True,
     "concat_sms_total": True,
     "content": True,
@@ -289,6 +299,88 @@ DISABLED_SENSORS = {
     "sms_sim_unread_num": True,
     "sms_nv_received_total":True,
     "sms_received_flag":True,
-    "tag": True
-    # Add other sensors here to disable by default
+    "tag": True,
+    "wifi_5g_enable": True,
+    "wifi_access_sta_num": True,
+    "wifi_chip1_ssid1_access_sta_num": True,
+    "wifi_chip1_ssid1_auth_mode": True,
+    "wifi_chip1_ssid1_ssid": True,
+    "wifi_chip1_ssid2_access_sta_num": True,
+    "wifi_chip2_ssid1_access_sta_num": True,
+    "wifi_chip2_ssid1_auth_mode": True,
+    "wifi_chip2_ssid1_auth_mode": True,
+    "wifi_chip2_ssid1_ssid": True,
+    "wifi_chip2_ssid2_access_sta_num": True,
+    "wifi_dfs_status": True,
+    "wifi_enable": True,
+    "wifi_on_off_state": True,
+    "m_ssid_enable": True,
+    "ex_wifi_profile": True,
+    "ex_ssid1": True,
+    "draft_group_id": True,
+    #MC889
+    "5g_cell_id": True,
+    "5g_dl_earfcn": True,
+    "cell_info_band": True,
+    "data_volume_limit_size": True,
+    "ex_ssid1": True,
+    "ex_wifi_profile": True,
+    "nr_5g_cell_id": True,
+    "preferred_dns_manual": True,
+    "ssid": True,
+    "sta_ip_status": True,
+    "standby_dns_manual": True,
+    "static_wan_ip_address": True,
+    "static_wan_status": True,
+    "station_mac": True,
+    "sts_received_flag": True,
+    "wifi_on_off_state": True,
+}
+
+DISABLED_SENSORS_MC888 = {
+    "concat_sms_received": True,
+    "concat_sms_total": True,
+    "content": True,
+    "cr_version": True,
+    "date": True,
+    "id": True,
+    "is_mandatory": True,
+    "is_night_mode": True,
+    "lte_ca_scell_arfcn": True,
+    "lte_earfcn_lock": True,
+    "lte_pci_lock": True,
+    "sms_nv_draftbox_total": True,
+    "sms_sim_total": True,
+    "sms_class": True,
+    "sms_dev_unread_num": True,
+    "sms_sim_rev_total": True,
+    "sms_sim_send_total": True,
+    "sms_sim_unread_num": True,
+    "sms_nv_received_total":True,
+    "sms_received_flag":True,
+    "tag": True,
+}
+
+DISABLED_SENSORS_MC801A = {
+    "concat_sms_received": True,
+    "concat_sms_total": True,
+    "content": True,
+    "cr_version": True,
+    "date": True,
+    "id": True,
+    "is_mandatory": True,
+    "is_night_mode": True,
+    "lte_ca_scell_arfcn": True,
+    "lte_earfcn_lock": True,
+    "lte_pci_lock": True,
+    "sms_nv_draftbox_total": True,
+    "sms_sim_total": True,
+    "sms_class": True,
+    "sms_dev_unread_num": True,
+    "sms_sim_rev_total": True,
+    "sms_sim_send_total": True,
+    "sms_sim_unread_num": True,
+    "sms_nv_received_total":True,
+    "sms_received_flag":True,
+    "tag": True,
 }

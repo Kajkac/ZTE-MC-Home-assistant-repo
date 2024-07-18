@@ -3,20 +3,34 @@ import logging
 import subprocess
 import asyncio
 from datetime import datetime, timedelta
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.entity import Entity, EntityCategory
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
-from .const import DOMAIN, SENSOR_NAMES, MANUFACTURER, MODEL, UNITS, DISABLED_SENSORS
+from .const import (
+    DOMAIN, SENSOR_NAMES, MANUFACTURER, MODEL, UNITS,
+    DISABLED_SENSORS_MC889, DISABLED_SENSORS_MC888, DISABLED_SENSORS_MC801A,
+    DIAGNOSTICS_SENSORS
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     ip_entry = entry.data["router_ip"]
     password_entry = entry.data["router_password"]
-    ping_interval = entry.data.get("ping_interval", 60)
-    sms_check_interval = entry.data.get("sms_check_interval", 100)
+    ping_interval = entry.data.get("ping_interval", 100)
+    sms_check_interval = entry.data.get("sms_check_interval", 200)
+    router_type = entry.data.get("router_type", "MC801A")
+
+    if router_type == "MC889":
+        disabled_sensors = DISABLED_SENSORS_MC889
+    elif router_type == "MC888":
+        disabled_sensors = DISABLED_SENSORS_MC888
+    else:
+        disabled_sensors = DISABLED_SENSORS_MC801A
+
+    _LOGGER.info(f"Router type selected: {router_type}")
 
     coordinator = ZTERouterDataUpdateCoordinator(hass, ip_entry, password_entry, ping_interval)
     sms_coordinator = ZTERouterSMSUpdateCoordinator(hass, ip_entry, password_entry, sms_check_interval)
@@ -30,9 +44,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     sensors = []
     for key in coordinator.data.keys():
         name = SENSOR_NAMES.get(key, key)  # Get the friendly name or default to key
-        if DISABLED_SENSORS.get(key, False):
-            _LOGGER.debug(f"Sensor {key} ({name}) is disabled by default.")
-        sensors.append(ZTERouterSensor(coordinator, name, key))
+        sensors.append(ZTERouterSensor(coordinator, name, key, disabled_sensors.get(key, False)))
 
     # Add new dynamic set of sensors
     dynamic_data = await hass.async_add_executor_job(
@@ -43,9 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     coordinator._data.update(dynamic_data)  # Update coordinator's data with dynamic data
     for key in dynamic_data.keys():
         name = SENSOR_NAMES.get(key, key)
-        if DISABLED_SENSORS.get(key, False):
-            _LOGGER.debug(f"Sensor {key} ({name}) is disabled by default.")
-        sensors.append(ZTERouterSensor(coordinator, name, key))
+        sensors.append(ZTERouterSensor(coordinator, name, key, disabled_sensors.get(key, False)))
 
     # Add the new sensor for command 6
     additional_data = await hass.async_add_executor_job(
@@ -56,13 +66,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     coordinator._data.update(additional_data)  # Update coordinator's data with additional data
     for key in additional_data.keys():
         name = SENSOR_NAMES.get(key, key)
-        if DISABLED_SENSORS.get(key, False):
-            _LOGGER.debug(f"Sensor {key} ({name}) is disabled by default.")
-        sensors.append(ZTERouterSensor(coordinator, name, key))
+        sensors.append(ZTERouterSensor(coordinator, name, key, disabled_sensors.get(key, False)))
 
     # Add the new sensor for Last SMS
     if "content" in additional_data:
-        sensors.append(LastSMSSensor(sms_coordinator, additional_data))  # Use the SMS coordinator
+        sensors.append(LastSMSSensor(sms_coordinator, additional_data, disabled_sensors.get("last_sms", False)))  # Use the SMS coordinator
 
     # Add the Connected Bands sensor
     sensors.append(ConnectedBandsSensor(coordinator))
@@ -71,6 +79,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     sensors.append(MonthlyUsageSensor(coordinator))
     sensors.append(DataLeftSensor(coordinator))
     sensors.append(ConnectionUptimeSensor(coordinator))
+
+    _LOGGER.info(f"Sensors added: {[sensor.name for sensor in sensors]}")
+    _LOGGER.info(f"Diagnostics sensors: {[sensor.name for sensor in sensors if sensor.is_diagnostics]}")
 
     async_add_entities(sensors, True)
 
@@ -153,12 +164,13 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
             raise
 
 class ZTERouterSensor(Entity):
-    def __init__(self, coordinator, name, key):
+    def __init__(self, coordinator, name, key, disabled_by_default=False):
         self.coordinator = coordinator
         self._name = name
         self._key = key
         self._state = None
-        self.entity_registry_enabled_default = not DISABLED_SENSORS.get(key, False)  # Set to False if the sensor should be hidden
+        self.entity_registry_enabled_default = not disabled_by_default
+        self._attr_is_diagnostics = key in DIAGNOSTICS_SENSORS
 
     @property
     def name(self):
@@ -191,6 +203,16 @@ class ZTERouterSensor(Entity):
     def unit_of_measurement(self):
         return UNITS.get(self._key)
 
+    @property
+    def is_diagnostics(self):
+        return self._attr_is_diagnostics
+
+    @property
+    def entity_category(self):
+        if self.is_diagnostics:
+            return EntityCategory.DIAGNOSTIC
+        return None
+
     async def async_added_to_hass(self):
         self.async_on_remove(self.coordinator.async_add_listener(
             lambda: asyncio.ensure_future(self.async_handle_coordinator_update())
@@ -206,12 +228,12 @@ class ZTERouterSensor(Entity):
         self.async_write_ha_state()
 
 class LastSMSSensor(Entity):
-    def __init__(self, coordinator, sms_data):
+    def __init__(self, coordinator, sms_data, disabled_by_default=False):
         self.coordinator = coordinator
         self._name = "Last SMS"
         self._state = sms_data.get("content", "NO DATA")  # Default to "NO DATA" if content is not available
         self._attributes = {k: v for k, v in sms_data.items() if k != "content"}
-        self.entity_registry_enabled_default = not DISABLED_SENSORS.get("last_sms", False)  # Check if the sensor should be hidden
+        self.entity_registry_enabled_default = not disabled_by_default
 
         # Parse and format the date attribute
         if "date" in self._attributes:
@@ -247,6 +269,14 @@ class LastSMSSensor(Entity):
     @property
     def extra_state_attributes(self):
         return self._attributes
+
+    @property
+    def is_diagnostics(self):
+        return False  # LastSMS is not a diagnostic sensor
+
+    @property
+    def entity_category(self):
+        return None
 
     async def async_added_to_hass(self):
         self.async_on_remove(self.coordinator.async_add_listener(
@@ -317,7 +347,7 @@ class ConnectedBandsSensor(Entity):
         self._name = "Connected Bands"
         self._state = None
         self._attributes = {}
-        self.entity_registry_enabled_default = not DISABLED_SENSORS.get("connected_bands", False)  # Check if the sensor should be hidden
+        self.entity_registry_enabled_default = True  # Set to True, enabled by default
 
     @property
     def name(self):
@@ -349,6 +379,14 @@ class ConnectedBandsSensor(Entity):
     @property
     def extra_state_attributes(self):
         return self._attributes
+
+    @property
+    def is_diagnostics(self):
+        return False  # ConnectedBands is not a diagnostic sensor
+
+    @property
+    def entity_category(self):
+        return None
 
     async def async_added_to_hass(self):
         self.async_on_remove(self.coordinator.async_add_listener(
@@ -396,7 +434,7 @@ class MonthlyUsageSensor(Entity):
         self.coordinator = coordinator
         self._name = "Monthly Usage"
         self._state = None
-        self.entity_registry_enabled_default = not DISABLED_SENSORS.get("monthly_usage", False)  # Check if the sensor should be hidden
+        self.entity_registry_enabled_default = True  # Set to True, enabled by default
 
     @property
     def name(self):
@@ -429,6 +467,14 @@ class MonthlyUsageSensor(Entity):
     def unit_of_measurement(self):
         return UNITS.get("monthly_tx_bytes")
 
+    @property
+    def is_diagnostics(self):
+        return False  # MonthlyUsage is not a diagnostic sensor
+
+    @property
+    def entity_category(self):
+        return None
+
     async def async_added_to_hass(self):
         self.async_on_remove(self.coordinator.async_add_listener(
             lambda: asyncio.ensure_future(self.async_handle_coordinator_update())
@@ -452,7 +498,7 @@ class DataLeftSensor(Entity):
         self.coordinator = coordinator
         self._name = "Data Left"
         self._state = None
-        self.entity_registry_enabled_default = not DISABLED_SENSORS.get("data_left", False)  # Check if the sensor should be hidden
+        self.entity_registry_enabled_default = True  # Set to True, enabled by default
 
     @property
     def name(self):
@@ -485,6 +531,14 @@ class DataLeftSensor(Entity):
     def unit_of_measurement(self):
         return UNITS.get("monthly_tx_bytes")
 
+    @property
+    def is_diagnostics(self):
+        return False  # DataLeft is not a diagnostic sensor
+
+    @property
+    def entity_category(self):
+        return None
+
     async def async_added_to_hass(self):
         self.async_on_remove(self.coordinator.async_add_listener(
             lambda: asyncio.ensure_future(self.async_handle_coordinator_update())
@@ -506,7 +560,7 @@ class ConnectionUptimeSensor(Entity):
         self.coordinator = coordinator
         self._name = "Connection Uptime"
         self._state = None
-        self.entity_registry_enabled_default = not DISABLED_SENSORS.get("connection_uptime", False)  # Check if the sensor should be hidden
+        self.entity_registry_enabled_default = True  # Set to True, enabled by default
 
     @property
     def name(self):
@@ -538,6 +592,14 @@ class ConnectionUptimeSensor(Entity):
     @property
     def unit_of_measurement(self):
         return UNITS.get("connection_uptime")
+
+    @property
+    def is_diagnostics(self):
+        return True  # ConnectionUptime is a diagnostic sensor
+
+    @property
+    def entity_category(self):
+        return EntityCategory.DIAGNOSTIC
 
     async def async_added_to_hass(self):
         self.async_on_remove(self.coordinator.async_add_listener(
