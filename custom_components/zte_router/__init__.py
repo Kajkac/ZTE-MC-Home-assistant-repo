@@ -81,50 +81,98 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.error("Could not find the necessary entities for automation.")
         return False
 
-    # Define the automation configuration with dynamic device_id and entity_id
-    automation_config = {
-        "id": f"{DOMAIN}_automatic_sms_sender_{entry.entry_id}",
-        "alias": "Automatic SMS Sender T-Mobile HR",
-        "trigger": [
-            {
-                "platform": "state",
-                "entity_id": sensor_entity_id,
-                "to": "Za nastavak surfanja po maksimalnoj dostupnoj brzini posaljite rijec BRZINA na broj 13909. Vas Hrvatski Telekom"
-            }
-        ],
-        "condition": [
-            {
-                "condition": "state",
-                "entity_id": sensor_entity_id,
-                "state": "Za nastavak surfanja po maksimalnoj dostupnoj brzini posaljite rijec BRZINA na broj 13909. Vas Hrvatski Telekom"
-            }
-        ],
-        "action": [
-            {
-                "service": "switch.turn_on",
-                "target": {
-                    "entity_id": switch_entity_id
+    # Define the automation configurations with dynamic device_id and entity_id
+    automations_config = [
+        {
+            "id": f"{DOMAIN}_automatic_sms_sender_{entry.entry_id}",
+            "alias": f"Automatic SMS Sender T-Mobile HR {ip_address}",
+            "trigger": [
+                {
+                    "platform": "time_pattern",
+                    "minutes": "/5"
                 }
-            }
-        ],
-        "mode": "single"
-    }
+            ],
+            "condition": [
+                {
+                    "condition": "state",
+                    "entity_id": sensor_entity_id,
+                    "state": "Za nastavak surfanja po maksimalnoj dostupnoj brzini posaljite rijec BRZINA na broj 13909. Vas Hrvatski Telekom"
+                }
+            ],
+            "action": [
+                {
+                    "service": "switch.turn_on",
+                    "target": {
+                        "entity_id": switch_entity_id
+                    }
+                }
+            ],
+            "mode": "single"
+        },
+        {
+            "id": f"{DOMAIN}_clean_sms_memory_{entry.entry_id}",
+            "alias": f"Clean SMS Memory {ip_address}",
+            "trigger": [
+                {
+                    "platform": "state",
+                    "entity_id": "sensor.sms_capacity_left",
+                    "to": "5"
+                }
+            ],
+            "condition": [
+                {
+                    "condition": "state",
+                    "entity_id": "sensor.sms_capacity_left",
+                    "state": "5"
+                }
+            ],
+            "action": [
+                {
+                    "service": "switch.turn_on",
+                    "target": {
+                        "entity_id": "switch.delete_all_sms"
+                    }
+                }
+            ],
+            "mode": "single"
+        },
+        {
+            "id": f"{DOMAIN}_zte_reboot_7hrs_{entry.entry_id}",
+            "alias": f"ZTE Reboot 7hrs {ip_address}",
+            "trigger": [
+                {
+                    "platform": "time",
+                    "at": "07:00:00"
+                }
+            ],
+            "condition": [],
+            "action": [
+                {
+                    "service": "switch.toggle",
+                    "target": {
+                        "entity_id": "switch.reboot_router"
+                    }
+                }
+            ],
+            "mode": "single"
+        }
+    ]
 
-    def automation_exists():
+    def automation_exists(alias):
         automations_file = hass.config.path("automations.yaml")
         try:
             if os.path.exists(automations_file):
                 with open(automations_file, 'r') as file:
                     automations = yaml.safe_load(file) or []
                 for automation in automations:
-                    if automation.get("alias") == "Automatic SMS Sender T-Mobile HR":
+                    if automation.get("alias") == alias:
                         return True
             return False
         except Exception as e:
             _LOGGER.error(f"Failed to read automation file: {e}")
             return False
 
-    def write_automation():
+    def write_automations():
         automations_file = hass.config.path("automations.yaml")
         try:
             if os.path.exists(automations_file):
@@ -133,10 +181,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             else:
                 automations = []
 
-            # Remove any existing automation with the same ID
-            automations = [a for a in automations if a.get("id") != automation_config["id"]]
-
-            automations.append(automation_config)
+            for automation_config in automations_config:
+                alias = automation_config["alias"]
+                # Remove any existing automation with the same alias
+                automations = [a for a in automations if a.get("alias") != alias]
+                automations.append(automation_config)
 
             with open(automations_file, 'w') as file:
                 yaml.dump(automations, file, default_flow_style=False)
@@ -144,19 +193,23 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             return True
 
         except Exception as e:
-            _LOGGER.error(f"Failed to write automation: {e}")
+            _LOGGER.error(f"Failed to write automations: {e}")
             return False
 
-    if not await hass.async_add_executor_job(automation_exists):
-        success = await hass.async_add_executor_job(write_automation)
+    automation_exists_results = []
+    for alias in [automation["alias"] for automation in automations_config]:
+        automation_exists_results.append(await hass.async_add_executor_job(automation_exists, alias))
+
+    if not all(automation_exists_results):
+        success = await hass.async_add_executor_job(write_automations)
         if success:
             # Reload automations
             await hass.services.async_call("automation", "reload")
-            _LOGGER.info("Automation 'Automatic SMS Sender T-Mobile HR' created successfully")
+            _LOGGER.info("Automations created successfully")
         else:
             return False
     else:
-        _LOGGER.info("Automation 'Automatic SMS Sender T-Mobile HR' already exists")
+        _LOGGER.info("Automations already exist")
 
     return True
 

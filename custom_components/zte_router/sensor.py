@@ -19,8 +19,8 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     ip_entry = entry.data["router_ip"]
     password_entry = entry.data["router_password"]
-    ping_interval = entry.data.get("ping_interval", 100)
-    sms_check_interval = entry.data.get("sms_check_interval", 200)
+    ping_interval = entry.data.get("ping_interval", 60)
+    sms_check_interval = entry.data.get("sms_check_interval", 100)
     router_type = entry.data.get("router_type", "MC801A")
 
     if router_type == "MC889":
@@ -73,7 +73,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         sensors.append(LastSMSSensor(sms_coordinator, additional_data, disabled_sensors.get("last_sms", False)))  # Use the SMS coordinator
 
     # Add the Connected Bands sensor
-    sensors.append(ConnectedBandsSensor(coordinator))
+    sensors.append(ConnectedBandsSensor(coordinator, disabled_sensors.get("connected_bands", False)))
 
     # Add the custom formatted sensors
     sensors.append(MonthlyUsageSensor(coordinator))
@@ -272,11 +272,11 @@ class LastSMSSensor(Entity):
 
     @property
     def is_diagnostics(self):
-        return False  # LastSMS is not a diagnostic sensor
+        return True  # LastSMS is a diagnostic sensor
 
     @property
     def entity_category(self):
-        return None
+        return EntityCategory.DIAGNOSTIC
 
     async def async_added_to_hass(self):
         self.async_on_remove(self.coordinator.async_add_listener(
@@ -342,12 +342,13 @@ def format_ca_bands(ca_bands, nr5g_action_band):
     return "+".join(ca_bands_formatted)
 
 class ConnectedBandsSensor(Entity):
-    def __init__(self, coordinator):
+    def __init__(self, coordinator, disabled_by_default=False):
         self.coordinator = coordinator
         self._name = "Connected Bands"
         self._state = None
         self._attributes = {}
-        self.entity_registry_enabled_default = True  # Set to True, enabled by default
+        self.entity_registry_enabled_default = not disabled_by_default
+        self._attr_is_diagnostics = True  # Ensure ConnectedBands is marked as diagnostics
 
     @property
     def name(self):
@@ -382,10 +383,12 @@ class ConnectedBandsSensor(Entity):
 
     @property
     def is_diagnostics(self):
-        return False  # ConnectedBands is not a diagnostic sensor
+        return self._attr_is_diagnostics
 
     @property
     def entity_category(self):
+        if self.is_diagnostics:
+            return EntityCategory.DIAGNOSTIC
         return None
 
     async def async_added_to_hass(self):

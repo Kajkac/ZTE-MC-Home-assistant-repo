@@ -308,18 +308,39 @@ if __name__ == "__main__":
     elif command == 4:
         result = zte.ztereboot()
     elif command == 5:
-        if len(sys.argv) < 5:
-            print("Error: msg_id required for command 5")
-            sys.exit(1)
-        msg_id = sys.argv[4]
-        result = zte.deletesms(msg_id)
+        result = zte.parsesms()
+        if result:
+            data = json.loads(result)
+            ids = [message['id'] for message in data['messages']]
+            if ids:
+                formatted_ids = ";".join(ids)
+                result = zte.deletesms(formatted_ids)
+            else:
+                print("No SMS in memory")
+                sys.exit(0)
     elif command == 6:
         result = zte.parsesms()
         if result:
             test = json.loads(result)
-            first_message = test["messages"][0]
-            first_message_json = json.dumps(first_message)
-            print(first_message_json)
+            if test["messages"]:
+                first_message = test["messages"][0]
+                first_message_json = json.dumps(first_message)
+                print(first_message_json)
+            else:
+                dummy_message = {
+                    'id': '999',
+                    'number': 'DUMMY',
+                    'content': 'NO SMS IN MEMORY',
+                    'tag': '1',
+                    'date': '24,07,18,09,39,05,+8',
+                    'draft_group_id': '',
+                    'received_all_concat_sms': '1',
+                    'concat_sms_total': '0',
+                    'concat_sms_received': '0',
+                    'sms_class': '4'
+                }
+                print(json.dumps(dummy_message))
+                sys.exit(0)
     elif command == 7:
         result = zte.zteinfo3()
     elif command == 8:
