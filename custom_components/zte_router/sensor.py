@@ -5,6 +5,7 @@ import asyncio
 from datetime import datetime, timedelta
 from homeassistant.helpers.entity import Entity, EntityCategory
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
@@ -163,7 +164,22 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.info(f"Router not available: {e}")
             raise
 
-class ZTERouterSensor(Entity):
+class ZTERouterEntity(RestoreEntity, Entity):
+    """Base class for ZTE Router sensors to ensure consistent MRO."""
+
+    async def async_added_to_hass(self):
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state is not None:
+            self._state = last_state.state
+            if hasattr(self, "_attributes"):
+                self._attributes.update(last_state.attributes)
+        self.async_on_remove(self.coordinator.async_add_listener(
+            lambda: asyncio.ensure_future(self.async_handle_coordinator_update())
+        ))
+        await self.async_handle_coordinator_update()
+
+class ZTERouterSensor(ZTERouterEntity):
     def __init__(self, coordinator, name, key, disabled_by_default=False):
         self.coordinator = coordinator
         self._name = name
@@ -213,12 +229,6 @@ class ZTERouterSensor(Entity):
             return EntityCategory.DIAGNOSTIC
         return None
 
-    async def async_added_to_hass(self):
-        self.async_on_remove(self.coordinator.async_add_listener(
-            lambda: asyncio.ensure_future(self.async_handle_coordinator_update())
-        ))
-        await self.async_handle_coordinator_update()
-
     async def async_update(self):
         await self.coordinator.async_request_refresh()
 
@@ -227,7 +237,7 @@ class ZTERouterSensor(Entity):
             self._state = self.coordinator.data.get(self._key, self._state)
         self.async_write_ha_state()
 
-class LastSMSSensor(Entity):
+class LastSMSSensor(ZTERouterEntity):
     def __init__(self, coordinator, sms_data, disabled_by_default=False):
         self.coordinator = coordinator
         self._name = "Last SMS"
@@ -277,12 +287,6 @@ class LastSMSSensor(Entity):
     @property
     def entity_category(self):
         return EntityCategory.DIAGNOSTIC
-
-    async def async_added_to_hass(self):
-        self.async_on_remove(self.coordinator.async_add_listener(
-            lambda: asyncio.ensure_future(self.async_handle_coordinator_update())
-        ))
-        await self.async_handle_coordinator_update()
 
     async def async_update(self):
         await self.coordinator.async_request_refresh()
@@ -341,7 +345,7 @@ def format_ca_bands(ca_bands, nr5g_action_band):
         ca_bands_formatted.append(f"{nr5g_action_band}")
     return "+".join(ca_bands_formatted)
 
-class ConnectedBandsSensor(Entity):
+class ConnectedBandsSensor(ZTERouterEntity):
     def __init__(self, coordinator, disabled_by_default=False):
         self.coordinator = coordinator
         self._name = "Connected Bands"
@@ -391,12 +395,6 @@ class ConnectedBandsSensor(Entity):
             return EntityCategory.DIAGNOSTIC
         return None
 
-    async def async_added_to_hass(self):
-        self.async_on_remove(self.coordinator.async_add_listener(
-            lambda: asyncio.ensure_future(self.async_handle_coordinator_update())
-        ))
-        await self.async_handle_coordinator_update()
-
     async def async_update(self):
         await self.coordinator.async_request_refresh()
 
@@ -432,7 +430,7 @@ class ConnectedBandsSensor(Entity):
             }
         self.async_write_ha_state()
 
-class MonthlyUsageSensor(Entity):
+class MonthlyUsageSensor(ZTERouterEntity):
     def __init__(self, coordinator):
         self.coordinator = coordinator
         self._name = "Monthly Usage"
@@ -478,12 +476,6 @@ class MonthlyUsageSensor(Entity):
     def entity_category(self):
         return None
 
-    async def async_added_to_hass(self):
-        self.async_on_remove(self.coordinator.async_add_listener(
-            lambda: asyncio.ensure_future(self.async_handle_coordinator_update())
-        ))
-        await self.async_handle_coordinator_update()
-
     async def async_update(self):
         await self.coordinator.async_request_refresh()
 
@@ -496,7 +488,7 @@ class MonthlyUsageSensor(Entity):
             self._state = round(monthly_usage_gb, 2)
         self.async_write_ha_state()
 
-class DataLeftSensor(Entity):
+class DataLeftSensor(ZTERouterEntity):
     def __init__(self, coordinator):
         self.coordinator = coordinator
         self._name = "Data Left"
@@ -542,12 +534,6 @@ class DataLeftSensor(Entity):
     def entity_category(self):
         return None
 
-    async def async_added_to_hass(self):
-        self.async_on_remove(self.coordinator.async_add_listener(
-            lambda: asyncio.ensure_future(self.async_handle_coordinator_update())
-        ))
-        await self.async_handle_coordinator_update()
-
     async def async_update(self):
         await self.coordinator.async_request_refresh()
 
@@ -558,7 +544,7 @@ class DataLeftSensor(Entity):
             self._state = round(data_left, 2)
         self.async_write_ha_state()
 
-class ConnectionUptimeSensor(Entity):
+class ConnectionUptimeSensor(ZTERouterEntity):
     def __init__(self, coordinator):
         self.coordinator = coordinator
         self._name = "Connection Uptime"
@@ -603,12 +589,6 @@ class ConnectionUptimeSensor(Entity):
     @property
     def entity_category(self):
         return EntityCategory.DIAGNOSTIC
-
-    async def async_added_to_hass(self):
-        self.async_on_remove(self.coordinator.async_add_listener(
-            lambda: asyncio.ensure_future(self.async_handle_coordinator_update())
-        ))
-        await self.async_handle_coordinator_update()
 
     async def async_update(self):
         await self.coordinator.async_request_refresh()
