@@ -86,6 +86,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         {
             "id": f"{DOMAIN}_automatic_sms_sender_{entry.entry_id}",
             "alias": f"Automatic SMS Sender T-Mobile HR {ip_address}",
+            "initial_state": False,
             "trigger": [
                 {
                     "platform": "time_pattern",
@@ -112,6 +113,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         {
             "id": f"{DOMAIN}_clean_sms_memory_{entry.entry_id}",
             "alias": f"Clean SMS Memory {ip_address}",
+            "initial_state": False,
             "trigger": [
                 {
                     "platform": "state",
@@ -139,6 +141,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         {
             "id": f"{DOMAIN}_zte_reboot_7hrs_{entry.entry_id}",
             "alias": f"ZTE Reboot 7hrs {ip_address}",
+            "initial_state": False,
             "trigger": [
                 {
                     "platform": "time",
