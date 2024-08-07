@@ -21,7 +21,9 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         ZTERouterSwitch(main_coordinator, ip_entry, password_entry, router_type, "Delete All SMS", "5"),
         ZTERouterSwitch(main_coordinator, ip_entry, password_entry, router_type, "Send SMS 50GB", "8"),
         ZTERouterSwitch(main_coordinator, ip_entry, password_entry, router_type, "Connect Data", "9"),
-        ZTERouterSwitch(main_coordinator, ip_entry, password_entry, router_type, "Disconnect Data", "10")
+        ZTERouterSwitch(main_coordinator, ip_entry, password_entry, router_type, "Disconnect Data", "10"),
+        ZTERouterSwitch(main_coordinator, ip_entry, password_entry, router_type, "Set 5G SA", "11"),
+        ZTERouterSwitch(main_coordinator, ip_entry, password_entry, router_type, "Set 5G NSA", "12")
     ], False)
 
 class ZTERouterSwitch(CoordinatorEntity, SwitchEntity):

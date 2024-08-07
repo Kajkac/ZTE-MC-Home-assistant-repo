@@ -78,6 +78,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     # Add the custom formatted sensors
     sensors.append(MonthlyUsageSensor(coordinator))
+    sensors.append(monthly_tx_gb(coordinator))
+    sensors.append(monthly_rx_gb(coordinator))
     sensors.append(DataLeftSensor(coordinator))
     sensors.append(ConnectionUptimeSensor(coordinator))
 
@@ -466,7 +468,7 @@ class MonthlyUsageSensor(ZTERouterEntity):
 
     @property
     def unit_of_measurement(self):
-        return UNITS.get("monthly_tx_bytes")
+        return "GB"
 
     @property
     def is_diagnostics(self):
@@ -488,6 +490,125 @@ class MonthlyUsageSensor(ZTERouterEntity):
             self._state = round(monthly_usage_gb, 2)
         self.async_write_ha_state()
 
+#define GB TX sensor
+class monthly_tx_gb(ZTERouterEntity):
+    def __init__(self, coordinator):
+        self.coordinator = coordinator
+        self._name = "Monthly TX GB"
+        self._state = None
+        self.entity_registry_enabled_default = True  # Set to True, enabled by default
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def state(self):
+        return self._state
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self.coordinator.ip_entry}_monthly_tx_gb"
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self.coordinator.ip_entry}")},
+            "name": self.coordinator.ip_entry,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": self.coordinator.data.get("wa_inner_version", "Unknown")
+        }
+
+    @property
+    def available(self):
+        """Return True if the entity is available."""
+        return True
+
+    @property
+    def unit_of_measurement(self):
+        return "GB"
+
+    @property
+    def is_diagnostics(self):
+        return False  #Monthly GB Sensor is not a diagnostic sensor
+
+    @property
+    def entity_category(self):
+        return None
+
+    async def async_update(self):
+        await self.coordinator.async_request_refresh()
+
+    async def async_handle_coordinator_update(self):
+        if self.coordinator.data:
+            data = self.coordinator.data
+            monthly_tx_bytes = float(data.get("monthly_tx_bytes", 0) or 0)
+            monthly_tx_gb = monthly_tx_bytes / 1024 / 1024 / 1024
+            self._state = round(monthly_tx_gb, 2)
+        self.async_write_ha_state()
+
+#define GB RX sensor
+class monthly_rx_gb(ZTERouterEntity):
+    def __init__(self, coordinator):
+        self.coordinator = coordinator
+        self._name = "Monthly RX GB"
+        self._state = None
+        self.entity_registry_enabled_default = True  # Set to True, enabled by default
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def state(self):
+        return self._state
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self.coordinator.ip_entry}_monthly_rx_gb"
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self.coordinator.ip_entry}")},
+            "name": self.coordinator.ip_entry,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": self.coordinator.data.get("wa_inner_version", "Unknown")
+        }
+
+    @property
+    def available(self):
+        """Return True if the entity is available."""
+        return True
+
+    @property
+    def unit_of_measurement(self):
+        return "GB"
+
+    @property
+    def is_diagnostics(self):
+        return False  #Monthly GB Sensor is not a diagnostic sensor
+
+    @property
+    def entity_category(self):
+        return None
+
+    async def async_update(self):
+        await self.coordinator.async_request_refresh()
+
+    async def async_handle_coordinator_update(self):
+        if self.coordinator.data:
+            data = self.coordinator.data
+            monthly_rx_bytes = float(data.get("monthly_rx_bytes", 0) or 0)
+            monthly_rx_gb = monthly_rx_bytes / 1024 / 1024 / 1024
+            self._state = round(monthly_rx_gb, 2)
+        self.async_write_ha_state()
+
+
+
+#define DataLeftSensor
 class DataLeftSensor(ZTERouterEntity):
     def __init__(self, coordinator):
         self.coordinator = coordinator
@@ -524,7 +645,7 @@ class DataLeftSensor(ZTERouterEntity):
 
     @property
     def unit_of_measurement(self):
-        return UNITS.get("monthly_tx_bytes")
+        return "GB"
 
     @property
     def is_diagnostics(self):
