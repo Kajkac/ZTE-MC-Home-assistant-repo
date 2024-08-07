@@ -1,0 +1,34 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Konfiguration ZTE Router",
+                "description": "Bitte gebe die benötigten Informationen ein um die ZTE Router Integration zu konfigurieren.",
+                "data": {
+                    "router_ip": "Router IP/Hostname",
+                    "router_password": "Router Passwort",
+                    "router_username": "Router Nutzername (In Entwicklung!)",
+                    "ping_interval": "Ping Intervall (Sekunden)",
+                    "sms_check_interval": "SMS Überprüfungs Intervall (Sekunden)"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Verbindung zum Router fehlgeschlagen. Bitte überprüfe die IP Adresse/Hostename und versuche es erneut."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Konfiguration ZTE Router Options",
+                "data": {
+                    "router_ip": "Router IP/Hostname",
+                    "router_password": "Router Passwort",
+                    "router_username": "Router Nutzername (In Entwicklung!)",
+                    "ping_interval": "Ping Intervall (Sekunden)",
+                    "sms_check_interval": "SMS Überprüfungs Intervall (Sekunden)"
+                }
+            }
+        }
+    }
+}
