@@ -245,42 +245,42 @@ class zteRouter:
         return json.dumps(smslist, indent=2)
         
     def connect_data(self):
-        ip = self.ip
-        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
-        cookie_pass = cookie
-
-        headers = {
-            "Host": ip,
-            "Referer": f"{self.referer}index.html",
-            "Cookie": f"{cookie_pass}"
-        }
-
-        payload = {
-            'isTest': 'false',
-            'goformId': 'CONNECT_NETWORK',
-            'AD': self.get_AD()
-        }
-        response = s.post(self.referer + "goform/goform_set_cmd_process", headers=headers, data=payload, verify=False)
-        return response.text
+        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        AD = self.get_AD()
+        header = {"Referer": self.referer, "Cookie": cookie}
+        payload = f'isTest=false&goformId=CONNECT_NETWORK&AD=' + AD
+        print(payload)
+        r = s.post(self.referer + "goform/goform_set_cmd_process", headers=header, data=payload, verify=False)
+        return r.status_code
 
     def disconnect_data(self):
-        ip = self.ip
-        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
-        cookie_pass = cookie
+        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        AD = self.get_AD()
+        header = {"Referer": self.referer, "Cookie": cookie}
+        payload = f'isTest=false&goformId=DISCONNECT_NETWORK&AD=' + AD
+        print(payload)
+        r = s.post(self.referer + "goform/goform_set_cmd_process", headers=header, data=payload, verify=False)
+        return r.status_code
 
-        headers = {
-            "Host": ip,
-            "Referer": f"{self.referer}index.html",
-            "Cookie": f"{cookie_pass}"
-        }
-
-        payload = {
-            'isTest': 'false',
-            'goformId': 'DISCONNECT_NETWORK',
-            'AD': self.get_AD()
-        }
-        response = s.post(self.referer + "goform/goform_set_cmd_process", headers=headers, data=payload, verify=False)
-        return response.text
+    def setdata_5G_SA(self):
+        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        AD = self.get_AD()
+        header = {"Referer": self.referer, "Cookie": cookie}
+        payload = f'isTest=false&goformId=Only_5G&AD=' + AD
+        payload = f'isTest=false&goformId=SET_BEARER_PREFERENCE&BearerPreference=Only_5G&AD=' + AD
+        print(payload)
+        r = s.post(self.referer + "goform/goform_set_cmd_process", headers=header, data=payload, verify=False)
+        return r.status_code
+        
+    def setdata_5G_NSA(self):
+        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        AD = self.get_AD()
+        header = {"Referer": self.referer, "Cookie": cookie}
+        payload = f'isTest=false&goformId=SET_BEARER_PREFERENCE&BearerPreference=LTE_AND_5G&AD=' + AD
+        print(payload)
+        r = s.post(self.referer + "goform/goform_set_cmd_process", headers=header, data=payload, verify=False)
+        return r.status_code
+        
         
         
 getsmstime = get_sms_time()
@@ -349,6 +349,10 @@ if __name__ == "__main__":
         result = zte.connect_data()
     elif command == 10:
         result = zte.disconnect_data()
+    elif command == 11:
+        result = zte.setdata_5G_SA()
+    elif command == 12:
+        result = zte.setdata_5G_NSA()
     if result and command != 6:
         print(result)
 
