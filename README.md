@@ -18,12 +18,12 @@ The custom integration is located in the `custom_components/zte_router` director
 
 ## Manual installation
 
-Copy the custom_components/zte_router of this repo into the path /config/custom_components/zte_router of your HA installation.
+Copy the `custom_components/zte_router` of this repo into the path `/config/custom_components/zte_router` of your HA installation.
 
 Restart Home Assistant go to Settings -> integrations -> Add integration 
 Find integration ZTE Router 
 
-Enter Router IP , password and select the model you have and waitz for integration to install all the device sensors
+Enter the Router IP, password and select the model you have and wait for the integration to install all the device sensors.
 
 ## Bugs: 
 
