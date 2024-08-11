@@ -1,3 +1,23 @@
+<<<<<<< HEAD
+![GitHub](https://img.shields.io/github/license/Kajkac/ZTE-MC-Home-assistant-repo)
+![GitHub Repo stars](https://img.shields.io/github/stars/Kajkac/ZTE-MC-Home-assistant-repo)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/Kajkac/ZTE-MC-Home-assistant-repo)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
+<!-- ![Pytest](https://github.com/juacas/zte_tracker/workflows/Pytest/badge.svg?branch=master)
+![CodeQL](https://github.com/juacas/zte_tracker/workflows/CodeQL/badge.svg?branch=master) -->
+![Validate with hassfest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/Validate%20with%20hassfest/badge.svg?branch=master)
+
+![GitHub contributors](https://img.shields.io/github/contributors/Kajkac/ZTE-MC-Home-assistant-repo)
+![Maintenance](https://img.shields.io/maintenance/yes/2025)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/y/Kajkac/ZTE-MC-Home-assistant-repo)
+![GitHub last commit](https://img.shields.io/github/last-commit/Kajkac/ZTE-MC-Home-assistant-repo)
+<!-- ![Codecov branch](https://img.shields.io/codecov/c/github/juacas/zte_tracker/master) -->
+
+# ZTE Router Integration for Home Assistant
+Component to integrate some ZTE routers as a device trackers in home assistant.
+
+=======
+>>>>>>> parent of 6a90990 (Update README.md)
 # ZTE Home assistant addon
 **ZTE Home assistant addon**
 
