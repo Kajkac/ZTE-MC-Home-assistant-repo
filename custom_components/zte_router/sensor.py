@@ -487,7 +487,10 @@ class MonthlyUsageSensor(ZTERouterEntity):
             monthly_tx_bytes = float(data.get("monthly_tx_bytes", 0) or 0)
             monthly_rx_bytes = float(data.get("monthly_rx_bytes", 0) or 0)
             monthly_usage_gb = (monthly_tx_bytes + monthly_rx_bytes) / 1024 / 1024 / 1024
-            self._state = round(monthly_usage_gb, 2)
+            if monthly_usage_gb == 0.0:
+                self._state = 'unavailable'
+            else:
+                self._state = round(monthly_usage_gb, 2)
         self.async_write_ha_state()
 
 #define GB TX sensor
@@ -545,7 +548,10 @@ class monthly_tx_gb(ZTERouterEntity):
             data = self.coordinator.data
             monthly_tx_bytes = float(data.get("monthly_tx_bytes", 0) or 0)
             monthly_tx_gb = monthly_tx_bytes / 1024 / 1024 / 1024
-            self._state = round(monthly_tx_gb, 2)
+            if monthly_tx_gb == 0.0:
+                self._state = 'unavailable'
+            else:
+                self._state = round(monthly_tx_gb, 2)
         self.async_write_ha_state()
 
 #define GB RX sensor
@@ -603,7 +609,10 @@ class monthly_rx_gb(ZTERouterEntity):
             data = self.coordinator.data
             monthly_rx_bytes = float(data.get("monthly_rx_bytes", 0) or 0)
             monthly_rx_gb = monthly_rx_bytes / 1024 / 1024 / 1024
-            self._state = round(monthly_rx_gb, 2)
+            if monthly_rx_gb == 0.0:
+                self._state = 'unavailable'
+            else:
+                self._state = round(monthly_rx_gb, 2)
         self.async_write_ha_state()
 
 
