@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 ![GitHub](https://img.shields.io/github/license/Kajkac/ZTE-MC-Home-assistant-repo)
 ![GitHub Repo stars](https://img.shields.io/github/stars/Kajkac/ZTE-MC-Home-assistant-repo)
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/Kajkac/ZTE-MC-Home-assistant-repo)
@@ -16,8 +15,6 @@
 # ZTE Router Integration for Home Assistant
 Component to integrate some ZTE routers as a device trackers in home assistant.
 
-=======
->>>>>>> parent of 6a90990 (Update README.md)
 # ZTE Home assistant addon
 **ZTE Home assistant addon**
 
@@ -43,15 +40,15 @@ Copy the custom_components/zte_router of this repo into the path /config/custom_
 Restart Home Assistant go to Settings -> integrations -> Add integration 
 Find integration ZTE Router 
 
-Enter Router IP , password and select the model you have and waitz for integration to install all the device sensors
+Enter Router IP , password and select the model you have and wait for integration to install all the device sensors
 
 ## Bugs: 
 
 1. Username currently not supported
-2. Errors in Home assistant log are for now present until i polish the addon 
-2. There are errors for sure but whoever wanna test it let me know
-4. Any sugestion you have please open the bug 
-5. I will push new builds as soon i will have more time
+2. Errors in Home assistant log - They are for now present until i polish the addon 
+2. Various errors in sensors etc. - This integration is classified as beta right now but can be tested by anyone. 
+4. Any suggestion you have please open the issues tab
+5. I will push new builds as soon i will have more time. Make sure you "star" this integration. 
 6. If u wanna donate for beer let me know :P 
 
 ## HACS installation
