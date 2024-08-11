@@ -1,5 +1,5 @@
 {
-  "domain": "zte_tracker",
+  "domain": "zte_router",
   "name": "ZTE Router",
   "version": "1.0.13",
   "documentation": "https://github.com/Kajkac/ZTE-MC-Home-assistant-repo",
@@ -12,6 +12,6 @@
     "logo": "/custom_components/zte_router/static/router_icon.png",
     "icon": "/custom_components/zte_router/static/router_icon.png"
   },
-  "translations": ["translations/en.json"],
+  "translations": ["translations/en.json", "translations/de.json"],
   "platforms": ["sensor", "switch"]
 }

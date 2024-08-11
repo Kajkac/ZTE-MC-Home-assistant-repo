@@ -51,6 +51,23 @@ Enter Router IP , password and select the model you have and wait for integratio
 5. I will push new builds as soon i will have more time. Make sure you "star" this integration. 
 6. If u wanna donate for beer let me know :P 
 
-## HACS installation
 
-When i polish the addon i will try to push it to HACS, but for now its only manual
+
+## Installation
+
+### Manual Installation
+
+1. Download the [zte-router](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/latest/download/zte_router.zip)
+2. Place the files of the .zip in your `root directory of homeassistant` (That should only effectivly place files into /custom_components/zte/router)
+3. Restart Homeassistant
+4. Search in "integration" for the ZTE_Router integration and add it to Homeassistant
+5. Configure your integration.
+
+### Installation with HACS
+
+1. Make sure the [HACS](https://github.com/custom-components/hacs) component is installed and working.
+2. Click on integration, "3 dots menu", custom repositories and add 'https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/' to your repositories.
+3. Search for the ZTE Router integration (blue button on lower page) 
+4. Restart homeassistant.
+5. Add ZTE Router Integration to your integrations and configure it.
+
