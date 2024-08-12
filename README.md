@@ -11,7 +11,7 @@
 4. Click `Add`
 5. Close `Custom Repositories` modal
 6. Click `+ EXPLORE & DOWNLOAD REPOSITORIES`
-7. Search for `icsee`
+7. Search for `ZTE router`
 8. Click `Download`
 9. Restart _Home Assistant_
 
