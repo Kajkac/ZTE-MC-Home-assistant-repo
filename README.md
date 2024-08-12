@@ -50,6 +50,6 @@ The custom integration is located in the `custom_components/zte_router` director
 5. I will push new builds as soon i will have more time
 6. If u wanna donate for beer let me know :P 
 
-## HACS installation
+## Contributors
 
-When i polish the addon i will try to push it to HACS, but for now its only manual
+If u have any sugestion or you are doing pull requests and adding new features, increment version number by 1 in manifest.json, so that github automation automaticly create a new release.
