@@ -1,4 +1,5 @@
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/kajkac)
+[![Whiskey or beer :)](https://img.buymeacoffee.com/button-api/?text=Whiskey or beer :)&emoji=🥤&slug=kajkac&button_colour=5F7FFF&font_colour=ffffff&font_family=Poppins&outline_colour=000000&coffee_colour=FFDD00)](https://www.buymeacoffee.com/kajkac)
+
 
 # ZTE Home assistant addon
 **ZTE Home assistant addon**
