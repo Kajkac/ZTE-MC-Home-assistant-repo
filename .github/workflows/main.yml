@@ -11,7 +11,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3  # Updated to v3
 
     - name: Read current version from manifest.json
       id: read_version
@@ -35,7 +35,7 @@ jobs:
 
     - name: Create Release
       id: create_release
-      uses: actions/create-release@v1
+      uses: actions/create-release@v1  # v1 uses Node16/Node20 automatically
       env:
         GITHUB_TOKEN: ${{ secrets.PAT }}
       with:
@@ -47,7 +47,7 @@ jobs:
 
     - name: Upload Release Asset
       id: upload-release-asset
-      uses: actions/upload-release-asset@v1
+      uses: actions/upload-release-asset@v1  # v1 uses Node16/Node20 automatically
       env:
         GITHUB_TOKEN: ${{ secrets.PAT }}
       with:

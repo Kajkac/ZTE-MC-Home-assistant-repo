@@ -3,30 +3,30 @@
         "step": {
             "user": {
                 "title": "Konfiguration ZTE Router",
-                "description": "Bitte gebe die benötigten Informationen ein um die ZTE Router Integration zu konfigurieren.",
+                "description": "Bitte gib die erforderlichen Informationen ein, um die ZTE-Router-Integration einzurichten.",
                 "data": {
-                    "router_ip": "Router IP/Hostname",
-                    "router_password": "Router Passwort",
-                    "router_username": "Router Nutzername (In Entwicklung!)",
-                    "ping_interval": "Ping Intervall (Sekunden)",
-                    "sms_check_interval": "SMS Überprüfungs Intervall (Sekunden)"
+                    "router_ip": "IP-Adresse des Routers",
+                    "router_password": "Router-Passwort",
+                    "router_username": "Router-Nutzername (in Entwicklung!)",
+                    "ping_interval": "Ping-Intervall (Sekunden)",
+                    "sms_check_interval": "SMS-Check-Interval (Sekunden)"
                 }
             }
         },
         "error": {
-            "cannot_connect": "Verbindung zum Router fehlgeschlagen. Bitte überprüfe die IP Adresse/Hostename und versuche es erneut."
+            "cannot_connect": "Verbindung zum Router konnte nicht hergestellt werden. Bitte überprüfe die IP-Adresse und versuchenes erneut."
         }
     },
     "options": {
         "step": {
             "init": {
-                "title": "Konfiguration ZTE Router Options",
+                "title": "Konfiguration der ZTE Router Optionen",
                 "data": {
-                    "router_ip": "Router IP/Hostname",
-                    "router_password": "Router Passwort",
-                    "router_username": "Router Nutzername (In Entwicklung!)",
-                    "ping_interval": "Ping Intervall (Sekunden)",
-                    "sms_check_interval": "SMS Überprüfungs Intervall (Sekunden)"
+                    "router_ip": "IP-Adresse des Routers",
+                    "router_password": "Router-Passwort",
+                    "router_username": "Router-Nutzername (in Entwicklung!)",
+                    "ping_interval": "Ping-Intervall (Sekunden)",
+                    "sms_check_interval": "SMS-Check-Interval (Sekunden)"
                 }
             }
         }
