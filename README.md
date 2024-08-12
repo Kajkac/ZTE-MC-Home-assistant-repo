@@ -1,6 +1,3 @@
-[![Whiskey or beer :)](https://img.buymeacoffee.com/button-api/?text=Whiskey%20or%20beer%20%3A%29&emoji=%F0%9F%A5%A4&slug=kajkac&button_colour=5F7FFF&font_colour=ffffff&font_family=Poppins&outline_colour=000000&coffee_colour=FFDD00)](https://www.buymeacoffee.com/kajkac)
-
-
 # ZTE Home assistant addon
 **ZTE Home assistant addon**
 
