@@ -1,5 +1,28 @@
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/kajkac)
+
 # ZTE Home assistant addon
 **ZTE Home assistant addon**
+
+### Option 1: [HACS](https://hacs.xyz/)
+
+1. Or `HACS` > `Integrations` > `⋮` > `Custom Repositories`
+2. `Repository`: paste the url of this repo
+3. `Category`: Integration
+4. Click `Add`
+5. Close `Custom Repositories` modal
+6. Click `+ EXPLORE & DOWNLOAD REPOSITORIES`
+7. Search for `icsee`
+8. Click `Download`
+9. Restart _Home Assistant_
+
+### Option 2: Manual copy
+
+Copy the `custom_components/zte_router` of this repo into the path `/config/custom_components/zte_router` of your HA installation.
+
+Restart Home Assistant go to Settings -> integrations -> Add integration 
+Find integration ZTE Router 
+
+Enter the Router IP, password and select the model you have and wait for the integration to install all the device sensors.
 
 Supported models : 
 
@@ -16,14 +39,6 @@ This repository contains the ZTE Router custom integration and an add-on to depl
 
 The custom integration is located in the `custom_components/zte_router` directory.
 
-## Manual installation
-
-Copy the `custom_components/zte_router` of this repo into the path `/config/custom_components/zte_router` of your HA installation.
-
-Restart Home Assistant go to Settings -> integrations -> Add integration 
-Find integration ZTE Router 
-
-Enter the Router IP, password and select the model you have and wait for the integration to install all the device sensors.
 
 ## Bugs: 
 
