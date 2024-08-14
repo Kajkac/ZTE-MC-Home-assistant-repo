@@ -103,6 +103,8 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         try:
+            # Add an 8-second delay before executing the script
+            await asyncio.sleep(8)
             # Offload the blocking function to a thread
             data = await self.hass.async_add_executor_job(
                 self.run_mc_script, self.ip_entry, self.password_entry, 7
@@ -150,6 +152,8 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         try:
+            # Add a 5-second delay before executing the script
+            await asyncio.sleep(5)
             # Offload the blocking function to a thread
             data = await self.hass.async_add_executor_job(
                 self.run_mc_script, self.ip_entry, self.password_entry, 6
@@ -244,10 +248,16 @@ class ZTERouterSensor(ZTERouterEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
+        old_state = self._state
         if self.coordinator.data:
             new_state = self.coordinator.data.get(self._key, None)
             if new_state is not None:
                 self._state = new_state
+                _LOGGER.info(f"Sensor {self._name} updated. Old state: {old_state}, New state: {self._state}")
+            else:
+                _LOGGER.warning(f"No new data for sensor {self._name}. Retaining last state: {self._state}")
+        else:
+            _LOGGER.warning(f"No data available from coordinator for sensor {self._name}. Retaining last state: {self._state}")
         self.async_write_ha_state()
 
 class LastSMSSensor(ZTERouterEntity):
@@ -305,6 +315,7 @@ class LastSMSSensor(ZTERouterEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
+        old_state = self._state
         _LOGGER.debug(f"Updating LastSMS sensor with new data: {self.coordinator.data}")
         data = self.coordinator.data
         if data and "content" in data:
@@ -312,6 +323,9 @@ class LastSMSSensor(ZTERouterEntity):
             self._attributes = {k: v for k, v in data.items() if k != "content"}
             if "date" in self._attributes:
                 self._attributes["formatted_date"] = self.format_date(self._attributes["date"])
+            _LOGGER.info(f"Last SMS sensor updated. Old state: {old_state}, New state: {self._state}")
+        else:
+            _LOGGER.warning(f"No new SMS data available. Retaining last state: {self._state}")
         self.async_write_ha_state()
 
     def format_date(self, date_str):
@@ -412,6 +426,7 @@ class ConnectedBandsSensor(ZTERouterEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
+        old_state = self._state
         if self.coordinator.data:
             data = self.coordinator.data
             rmcc = data.get("rmcc", "")
@@ -441,6 +456,9 @@ class ConnectedBandsSensor(ZTERouterEntity):
                 "ca_bands": ca_bands,
                 "enb_id": enb_id,
             }
+            _LOGGER.info(f"Connected Bands sensor updated. Old state: {old_state}, New state: {self._state}")
+        else:
+            _LOGGER.warning(f"No data available for Connected Bands sensor. Retaining last state: {self._state}")
         self.async_write_ha_state()
 
 class MonthlyUsageSensor(ZTERouterEntity):
@@ -493,12 +511,16 @@ class MonthlyUsageSensor(ZTERouterEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
+        old_state = self._state
         if self.coordinator.data:
             data = self.coordinator.data
             monthly_tx_bytes = float(data.get("monthly_tx_bytes", 0) or 0)
             monthly_rx_bytes = float(data.get("monthly_rx_bytes", 0) or 0)
             monthly_usage_gb = (monthly_tx_bytes + monthly_rx_bytes) / 1024 / 1024 / 1024
             self._state = round(monthly_usage_gb, 2)
+            _LOGGER.info(f"Monthly Usage sensor updated. Old state: {old_state}, New state: {self._state}")
+        else:
+            _LOGGER.warning(f"No data available for Monthly Usage sensor. Retaining last state: {self._state}")
         self.async_write_ha_state()
 
 #define GB TX sensor
@@ -552,11 +574,15 @@ class monthly_tx_gb(ZTERouterEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
+        old_state = self._state
         if self.coordinator.data:
             data = self.coordinator.data
             monthly_tx_bytes = float(data.get("monthly_tx_bytes", 0) or 0)
             monthly_tx_gb = monthly_tx_bytes / 1024 / 1024 / 1024
             self._state = round(monthly_tx_gb, 2)
+            _LOGGER.info(f"Monthly TX GB sensor updated. Old state: {old_state}, New state: {self._state}")
+        else:
+            _LOGGER.warning(f"No data available for Monthly TX GB sensor. Retaining last state: {self._state}")
         self.async_write_ha_state()
 
 #define GB RX sensor
@@ -610,11 +636,15 @@ class monthly_rx_gb(ZTERouterEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
+        old_state = self._state
         if self.coordinator.data:
             data = self.coordinator.data
             monthly_rx_bytes = float(data.get("monthly_rx_bytes", 0) or 0)
             monthly_rx_gb = monthly_rx_bytes / 1024 / 1024 / 1024
             self._state = round(monthly_rx_gb, 2)
+            _LOGGER.info(f"Monthly RX GB sensor updated. Old state: {old_state}, New state: {self._state}")
+        else:
+            _LOGGER.warning(f"No data available for Monthly RX GB sensor. Retaining last state: {self._state}")
         self.async_write_ha_state()
 
 #define DataLeftSensor
@@ -668,10 +698,14 @@ class DataLeftSensor(ZTERouterEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
+        old_state = self._state
         if self.coordinator.data:
             monthly_usage = float(self.hass.states.get("sensor.monthly_usage").state or 0)
             data_left = 200 - monthly_usage if monthly_usage < 200 else 50 - (monthly_usage % 50)
             self._state = round(data_left, 2)
+            _LOGGER.info(f"Data Left sensor updated. Old state: {old_state}, New state: {self._state}")
+        else:
+            _LOGGER.warning(f"No data available for Data Left sensor. Retaining last state: {self._state}")
         self.async_write_ha_state()
 
 class ConnectionUptimeSensor(ZTERouterEntity):
@@ -724,8 +758,12 @@ class ConnectionUptimeSensor(ZTERouterEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
+        old_state = self._state
         if self.coordinator.data:
             realtime_time = float(self.coordinator.data.get("realtime_time", 0) or 0)
             uptime_hours = realtime_time / 3600
             self._state = round(uptime_hours, 2)
+            _LOGGER.info(f"Connection Uptime sensor updated. Old state: {old_state}, New state: {self._state}")
+        else:
+            _LOGGER.warning(f"No data available for Connection Uptime sensor. Retaining last state: {self._state}")
         self.async_write_ha_state()
