@@ -1,4 +1,5 @@
 import json
+import time
 import logging
 import subprocess
 import asyncio
@@ -113,19 +114,27 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.info(f"Router not available: {err}")
             return self._data
 
-    def run_mc_script(self, ip, password, command):
-        try:
-            result = subprocess.run(
-                ["python3", "/config/custom_components/zte_router/mc.py", ip, password, str(command)],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            _LOGGER.debug(f"Output for command {command}: {result.stdout}")
-            return result.stdout
-        except subprocess.CalledProcessError as e:
-            _LOGGER.info(f"Router not available: {e}")
-            raise
+    def run_mc_script(self, ip, password, command, retries=3, delay=2):
+        attempt = 0
+        while attempt < retries:
+            try:
+                result = subprocess.run(
+                    ["python3", "/config/custom_components/zte_router/mc.py", ip, password, str(command)],
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                _LOGGER.debug(f"Output for command {command}: {result.stdout}")
+                return result.stdout
+            except subprocess.CalledProcessError as e:
+                _LOGGER.warning(f"Attempt {attempt + 1} failed with error: {e}. Retrying in {delay} seconds...")
+                attempt += 1
+                if attempt < retries:
+                    time.sleep(delay)
+                    delay *= 2  # Double the delay time for the next retry
+                else:
+                    _LOGGER.error(f"All {retries} attempts failed. Raising error.")
+                    raise
 
 class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
     def __init__(self, hass, ip_entry, password_entry, sms_check_interval):
