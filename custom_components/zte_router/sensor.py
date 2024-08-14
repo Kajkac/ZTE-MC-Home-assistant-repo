@@ -245,7 +245,9 @@ class ZTERouterSensor(ZTERouterEntity):
 
     async def async_handle_coordinator_update(self):
         if self.coordinator.data:
-            self._state = self.coordinator.data.get(self._key, self._state)
+            new_state = self.coordinator.data.get(self._key, None)
+            if new_state is not None:
+                self._state = new_state
         self.async_write_ha_state()
 
 class LastSMSSensor(ZTERouterEntity):
@@ -614,8 +616,6 @@ class monthly_rx_gb(ZTERouterEntity):
             monthly_rx_gb = monthly_rx_bytes / 1024 / 1024 / 1024
             self._state = round(monthly_rx_gb, 2)
         self.async_write_ha_state()
-
-
 
 #define DataLeftSensor
 class DataLeftSensor(ZTERouterEntity):

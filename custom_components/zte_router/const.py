@@ -149,6 +149,7 @@ DIAGNOSTICS_SENSORS = {
 
 # Define units of measurement for the sensors
 UNITS = {
+    "connection_uptime": "hours",
     "wa_inner_version": None,
     "cr_version": None,
     "network_type": None,
