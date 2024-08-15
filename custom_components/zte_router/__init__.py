@@ -27,11 +27,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up ZTE Router from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    ping_interval = entry.data.get("ping_interval", 60)
-    sms_check_interval = entry.data.get("sms_check_interval", 100)
+    # Merge entry.data with entry.options. entry.options will override any values in entry.data.
+    config = {**entry.data, **entry.options}
 
-    coordinator = ZTERouterDataUpdateCoordinator(hass, entry.data["router_ip"], entry.data["router_password"], ping_interval)
-    sms_coordinator = ZTERouterSMSUpdateCoordinator(hass, entry.data["router_ip"], entry.data["router_password"], sms_check_interval)
+    ping_interval = config.get("ping_interval", 60)
+    sms_check_interval = config.get("sms_check_interval", 100)
+
+    coordinator = ZTERouterDataUpdateCoordinator(hass, config["router_ip"], config["router_password"], ping_interval)
+    sms_coordinator = ZTERouterSMSUpdateCoordinator(hass, config["router_ip"], config["router_password"], sms_check_interval)
 
     await coordinator.async_config_entry_first_refresh()
     await sms_coordinator.async_config_entry_first_refresh()
@@ -56,7 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # Register the device in the device registry
     device_registry = async_get_device_registry(hass)
     entity_registry = async_get_entity_registry(hass)
-    ip_address = entry.data.get('router_ip')
+    ip_address = config.get('router_ip')
     unique_id = f"{DOMAIN}_{ip_address}"
     device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
