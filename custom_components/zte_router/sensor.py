@@ -25,14 +25,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     sms_check_interval = entry.data.get("sms_check_interval", 100)
     router_type = entry.data.get("router_type", "MC801A")
 
+    _LOGGER.info(f"Router type selected: {router_type}")
+    _LOGGER.info(f"Ping interval: {ping_interval} seconds")
+    _LOGGER.info(f"SMS check interval: {sms_check_interval} seconds")
+
     if router_type == "MC889":
         disabled_sensors = DISABLED_SENSORS_MC889
     elif router_type == "MC888":
         disabled_sensors = DISABLED_SENSORS_MC888
     else:
         disabled_sensors = DISABLED_SENSORS_MC801A
-
-    _LOGGER.info(f"Router type selected: {router_type}")
 
     coordinator = ZTERouterDataUpdateCoordinator(hass, ip_entry, password_entry, ping_interval)
     sms_coordinator = ZTERouterSMSUpdateCoordinator(hass, ip_entry, password_entry, sms_check_interval)
@@ -41,6 +43,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     await sms_coordinator.async_refresh()
 
     if not coordinator.last_update_success or not sms_coordinator.last_update_success:
+        _LOGGER.error("Coordinator(s) failed to refresh successfully.")
         raise PlatformNotReady
 
     sensors = []
@@ -94,14 +97,16 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
         self.ip_entry = ip_entry
         self.password_entry = password_entry
         self._data = {}
+        _LOGGER.info(f"Initializing DataUpdateCoordinator with ping interval: {ping_interval} seconds")
         super().__init__(
             hass,
             _LOGGER,
             name="zte_router",
-            update_interval=timedelta(seconds=ping_interval),
+            update_interval=timedelta(seconds=ping_interval),  # Use ping_interval
         )
 
     async def _async_update_data(self):
+        _LOGGER.info("Starting _async_update_data in DataUpdateCoordinator at %s", datetime.now())
         try:
             # Add an 8-second delay before executing the script
             await asyncio.sleep(8)
@@ -113,12 +118,13 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
             self._data.update(json.loads(data))
             return self._data
         except Exception as err:
-            _LOGGER.info(f"Router not available: {err}")
+            _LOGGER.error(f"Error during _async_update_data: {err}")
             return self._data
 
     def run_mc_script(self, ip, password, command, retries=3, delay=2):
         attempt = 0
         while attempt < retries:
+            _LOGGER.info(f"Running mc.py script for command {command}, attempt {attempt + 1}")
             try:
                 result = subprocess.run(
                     ["python3", "/config/custom_components/zte_router/mc.py", ip, password, str(command)],
@@ -135,7 +141,7 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
                     time.sleep(delay)
                     delay *= 2  # Double the delay time for the next retry
                 else:
-                    _LOGGER.error(f"All {retries} attempts failed. Raising error.")
+                    _LOGGER.error(f"All {retries} attempts failed for command {command}. Raising error.")
                     raise
 
 class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
@@ -143,14 +149,16 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
         self.ip_entry = ip_entry
         self.password_entry = password_entry
         self._data = {}
+        _LOGGER.info(f"Initializing SMSUpdateCoordinator with SMS check interval: {sms_check_interval} seconds")
         super().__init__(
             hass,
             _LOGGER,
             name="zte_router_sms",
-            update_interval=timedelta(seconds=sms_check_interval),
+            update_interval=timedelta(seconds=sms_check_interval),  # Use sms_check_interval
         )
 
     async def _async_update_data(self):
+        _LOGGER.info("Starting _async_update_data in SMSUpdateCoordinator at %s", datetime.now())
         try:
             # Add a 5-second delay before executing the script
             await asyncio.sleep(5)
@@ -162,10 +170,11 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
             self._data.update(json.loads(data))
             return self._data
         except Exception as err:
-            _LOGGER.info(f"Router not available: {err}")
+            _LOGGER.error(f"Error during _async_update_data (SMS): {err}")
             return self._data
 
     def run_mc_script(self, ip, password, command):
+        _LOGGER.info(f"Running mc.py script for SMS command {command}")
         try:
             result = subprocess.run(
                 ["python3", "/config/custom_components/zte_router/mc.py", ip, password, str(command)],
@@ -176,19 +185,21 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(f"Output for SMS command {command}: {result.stdout}")
             return result.stdout
         except subprocess.CalledProcessError as e:
-            _LOGGER.info(f"Router not available: {e}")
+            _LOGGER.error(f"Error running SMS command {command}: {e}")
             raise
 
 class ZTERouterEntity(RestoreEntity, Entity):
     """Base class for ZTE Router sensors to ensure consistent MRO."""
 
     async def async_added_to_hass(self):
+        _LOGGER.info(f"Entity {self.name} added to hass at {datetime.now()}")
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
         if last_state is not None:
             self._state = last_state.state
             if hasattr(self, "_attributes"):
                 self._attributes.update(last_state.attributes)
+            _LOGGER.debug(f"Restored state for {self.name}: {self._state}")
         self.async_on_remove(self.coordinator.async_add_listener(
             lambda: asyncio.ensure_future(self.async_handle_coordinator_update())
         ))
@@ -202,6 +213,8 @@ class ZTERouterSensor(ZTERouterEntity):
         self._state = None
         self.entity_registry_enabled_default = not disabled_by_default
         self._attr_is_diagnostics = key in DIAGNOSTICS_SENSORS
+        self._attr_should_poll = False  # Disable default polling
+        _LOGGER.info(f"Initializing sensor {self._name} with key {self._key}")
 
     @property
     def name(self):
@@ -245,6 +258,7 @@ class ZTERouterSensor(ZTERouterEntity):
         return None
 
     async def async_update(self):
+        _LOGGER.info(f"Manual update requested for sensor {self._name} at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
@@ -267,6 +281,8 @@ class LastSMSSensor(ZTERouterEntity):
         self._state = sms_data.get("content", "NO DATA")  # Default to "NO DATA" if content is not available
         self._attributes = {k: v for k, v in sms_data.items() if k != "content"}
         self.entity_registry_enabled_default = not disabled_by_default
+        self._attr_should_poll = False  # Disable default polling
+        _LOGGER.info(f"Initializing Last SMS sensor with state: {self._state}")
 
         # Parse and format the date attribute
         if "date" in self._attributes:
@@ -312,6 +328,7 @@ class LastSMSSensor(ZTERouterEntity):
         return EntityCategory.DIAGNOSTIC
 
     async def async_update(self):
+        _LOGGER.info(f"Manual update requested for Last SMS sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
@@ -380,6 +397,8 @@ class ConnectedBandsSensor(ZTERouterEntity):
         self._attributes = {}
         self.entity_registry_enabled_default = not disabled_by_default
         self._attr_is_diagnostics = True  # Ensure ConnectedBands is marked as diagnostics
+        self._attr_should_poll = False  # Disable default polling
+        _LOGGER.info(f"Initializing Connected Bands sensor")
 
     @property
     def name(self):
@@ -423,6 +442,7 @@ class ConnectedBandsSensor(ZTERouterEntity):
         return None
 
     async def async_update(self):
+        _LOGGER.info(f"Manual update requested for Connected Bands sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
@@ -467,6 +487,8 @@ class MonthlyUsageSensor(ZTERouterEntity):
         self._name = "Monthly Usage"
         self._state = None
         self.entity_registry_enabled_default = True  # Set to True, enabled by default
+        self._attr_should_poll = False  # Disable default polling
+        _LOGGER.info(f"Initializing Monthly Usage sensor")
 
     @property
     def name(self):
@@ -508,6 +530,7 @@ class MonthlyUsageSensor(ZTERouterEntity):
         return None
 
     async def async_update(self):
+        _LOGGER.info(f"Manual update requested for Monthly Usage sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
@@ -530,6 +553,8 @@ class monthly_tx_gb(ZTERouterEntity):
         self._name = "Monthly TX GB"
         self._state = None
         self.entity_registry_enabled_default = True  # Set to True, enabled by default
+        self._attr_should_poll = False  # Disable default polling
+        _LOGGER.info(f"Initializing Monthly TX GB sensor")
 
     @property
     def name(self):
@@ -571,6 +596,7 @@ class monthly_tx_gb(ZTERouterEntity):
         return None
 
     async def async_update(self):
+        _LOGGER.info(f"Manual update requested for Monthly TX GB sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
@@ -592,6 +618,8 @@ class monthly_rx_gb(ZTERouterEntity):
         self._name = "Monthly RX GB"
         self._state = None
         self.entity_registry_enabled_default = True  # Set to True, enabled by default
+        self._attr_should_poll = False  # Disable default polling
+        _LOGGER.info(f"Initializing Monthly RX GB sensor")
 
     @property
     def name(self):
@@ -633,6 +661,7 @@ class monthly_rx_gb(ZTERouterEntity):
         return None
 
     async def async_update(self):
+        _LOGGER.info(f"Manual update requested for Monthly RX GB sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
@@ -654,6 +683,8 @@ class DataLeftSensor(ZTERouterEntity):
         self._name = "Data Left"
         self._state = None
         self.entity_registry_enabled_default = True  # Set to True, enabled by default
+        self._attr_should_poll = False  # Disable default polling
+        _LOGGER.info(f"Initializing Data Left sensor")
 
     @property
     def name(self):
@@ -695,6 +726,7 @@ class DataLeftSensor(ZTERouterEntity):
         return None
 
     async def async_update(self):
+        _LOGGER.info(f"Manual update requested for Data Left sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
@@ -714,6 +746,8 @@ class ConnectionUptimeSensor(ZTERouterEntity):
         self._name = "Connection Uptime"
         self._state = None
         self.entity_registry_enabled_default = True  # Set to True, enabled by default
+        self._attr_should_poll = False  # Disable default polling
+        _LOGGER.info(f"Initializing Connection Uptime sensor")
 
     @property
     def name(self):
@@ -755,6 +789,7 @@ class ConnectionUptimeSensor(ZTERouterEntity):
         return EntityCategory.DIAGNOSTIC
 
     async def async_update(self):
+        _LOGGER.info(f"Manual update requested for Connection Uptime sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     async def async_handle_coordinator_update(self):
