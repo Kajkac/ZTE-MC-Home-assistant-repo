@@ -1,6 +1,6 @@
 """Constants for the ZTE Router integration."""
 
-DOMAIN = "zte_tracker"
+DOMAIN = "zte_router"
 DEFAULT_USERNAME = "admin"
 DEVICE_NAME = "ZTE MC Series"
 MANUFACTURER = "ZTE"

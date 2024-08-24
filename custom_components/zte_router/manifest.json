@@ -1,7 +1,7 @@
 {
-  "domain": "zte_tracker",
+  "domain": "zte_router",
   "name": "ZTE Router",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "documentation": "https://github.com/Kajkac/ZTE-MC-Home-assistant-repo",
   "requirements": ["aiohttp"],
   "dependencies": [],

@@ -1,4 +1,5 @@
 {
-    "name": "ZTE Router",
-    "render_readme": true
-  }
+  "name": "ZTE Router",
+  "render_readme": true,
+  "country": "HR"
+}
