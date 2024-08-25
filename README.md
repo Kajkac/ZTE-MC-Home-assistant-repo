@@ -1,5 +1,3 @@
-# zte_router
-# ZTE Home assistant addon
 **ZTE Home assistant addon**
 
 [![GitHub release](https://img.shields.io/github/release/Kajkac/ZTE-MC-Home-assistant-repo.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/)
