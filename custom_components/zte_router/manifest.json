@@ -9,6 +9,5 @@
   "config_flow": true,
   "codeowners": ["@Kajkac"],
   "iot_class": "local_polling",
-  "translations": ["translations/en.json"],
   "integration_type": "hub"
 }
