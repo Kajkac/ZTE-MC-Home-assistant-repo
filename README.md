@@ -1,3 +1,4 @@
+# zte_router
 # ZTE Home assistant addon
 **ZTE Home assistant addon**
 
@@ -7,6 +8,9 @@
 [![GH-code-size](https://img.shields.io/github/languages/code-size/dckiller51/bodymiscale.svg?color=red&style=flat-square)](https://github.com/dckiller51/bodymiscale)
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg?style=flat-square)](https://github.com/hacs)
 
+## Installation
+
+### Via HACS
 
 ### Option 1: [HACS](https://hacs.xyz/)
 
@@ -20,6 +24,8 @@
 8. Click `Download`
 9. Restart _Home Assistant_
 
+### Manual installation
+
 ### Option 2: Manual copy
 
 Copy the `custom_components/zte_router` of this repo into the path `/config/custom_components/zte_router` of your HA installation.
@@ -28,6 +34,8 @@ Restart Home Assistant go to Settings -> integrations -> Add integration
 Find integration ZTE Router 
 
 Enter the Router IP, password and select the model you have and wait for the integration to install all the device sensors.
+
+## Configuration
 
 Supported models : 
 
