@@ -2,9 +2,6 @@
 **ZTE Home assistant addon**
 
 [![GitHub release](https://img.shields.io/github/release/Kajkac/ZTE-MC-Home-assistant-repo.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/)
-[![HA integration usage](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=YOUR_JSON_URL&query=YOUR_JSON_QUERY)](YOUR_JSON_URL)
-[![HA core integration usage](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=core%20integration%20usage&suffix=%20installs&cacheSeconds=15600&url=YOUR_JSON_URL&query=YOUR_JSON_QUERY)](YOUR_INTEGRATION_PAGE_URL)
-[![Open in Visual Studio Code](https://open.vscode.dev/badges/open-in-vscode.svg)](https://open.vscode.dev/Kajkac/ZTE-MC-Home-assistant-repo)
 
 
 ### Option 1: [HACS](https://hacs.xyz/)
