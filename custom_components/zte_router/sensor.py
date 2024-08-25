@@ -733,7 +733,9 @@ class DataLeftSensor(ZTERouterEntity):
         old_state = self._state
         if self.coordinator.data:
             monthly_usage = float(self.hass.states.get("sensor.monthly_usage").state or 0)
-            data_left = 200 - monthly_usage if monthly_usage < 200 else 50 - (monthly_usage % 50)
+            # Use the configurable threshold from the options
+            threshold = self.coordinator.config_entry.options.get("monthly_usage_threshold", 200)
+            data_left = threshold - monthly_usage if monthly_usage < threshold else 50 - (monthly_usage % 50)
             self._state = round(data_left, 2)
             _LOGGER.info(f"Data Left sensor updated. Old state: {old_state}, New state: {self._state}")
         else:

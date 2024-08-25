@@ -25,6 +25,7 @@ class ZTERouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Optional("ping_interval", default=100): int,
             vol.Optional("sms_check_interval", default=200): int,
             vol.Required("router_type", default="MC801A"): vol.In(["MC801A", "MC889", "MC888"]),
+            vol.Required("monthly_usage_threshold", default=200): int,  # New required option
         })
 
         return self.async_show_form(
@@ -58,6 +59,7 @@ class ZTERouterOptionsFlowHandler(config_entries.OptionsFlow):
             "ping_interval": self.config_entry.options.get("ping_interval", self.config_entry.data.get("ping_interval", 100)),
             "sms_check_interval": self.config_entry.options.get("sms_check_interval", self.config_entry.data.get("sms_check_interval", 200)),
             "router_type": self.config_entry.options.get("router_type", self.config_entry.data.get("router_type", "MC801A")),
+            "monthly_usage_threshold": self.config_entry.options.get("monthly_usage_threshold", 200),  # New option
         }
 
         options_schema = vol.Schema({
@@ -67,6 +69,7 @@ class ZTERouterOptionsFlowHandler(config_entries.OptionsFlow):
             vol.Optional("ping_interval", default=current_data["ping_interval"]): int,
             vol.Optional("sms_check_interval", default=current_data["sms_check_interval"]): int,
             vol.Required("router_type", default=current_data["router_type"]): vol.In(["MC801A", "MC889", "MC888"]),
+            vol.Required("monthly_usage_threshold", default=current_data["monthly_usage_threshold"]): int,  # Make it required in options
         })
 
         return self.async_show_form(step_id="init", data_schema=options_schema)
