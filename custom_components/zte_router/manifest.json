@@ -8,10 +8,6 @@
   "config_flow": true,
   "codeowners": ["@Kajkac"],
   "iot_class": "local_polling",
-  "icons": {
-    "logo": "/custom_components/zte_router/static/router_icon.png",
-    "icon": "/custom_components/zte_router/static/router_icon.png"
-  },
   "translations": ["translations/en.json"],
   "platforms": ["sensor", "switch"]
 }

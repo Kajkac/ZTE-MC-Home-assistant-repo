@@ -11,17 +11,6 @@ from .sensor import ZTERouterDataUpdateCoordinator, ZTERouterSMSUpdateCoordinato
 
 _LOGGER = logging.getLogger(__name__)
 
-class IconView(HomeAssistantView):
-    url = "/api/zte_router/icon"
-    name = "api:zte_router:icon"
-
-    async def get(self, request):
-        return self.file_response("/config/custom_components/zte_router/static/router_icon.png")
-
-async def async_setup(hass: HomeAssistant, config: dict):
-    """Set up the ZTE Router component."""
-    hass.http.register_view(IconView)
-    return True
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up ZTE Router from a config entry."""
@@ -53,8 +42,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
-    # Register the icon view
-    hass.http.register_view(IconView)
 
     # Register the device in the device registry
     device_registry = async_get_device_registry(hass)
