@@ -3,10 +3,7 @@
 [![GitHub release](https://img.shields.io/github/release/Kajkac/ZTE-MC-Home-assistant-repo.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/)
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 
-[![Coverage Status](https://coveralls.io/repos/apache/commons-collections/badge.svg)](https://coveralls.io/r/apache/commons-collections)
-[![Maven Central](https://maven-badges.herokuapp.com/maven-central/org.apache.commons/commons-collections4/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.apache.commons/commons-collections4/)
-[![Javadocs](https://javadoc.io/badge/org.apache.commons/commons-collections4/4.4.svg)](https://javadoc.io/doc/org.apache.commons/commons-collections4/4.4)
-[![CodeQL](https://github.com/apache/commons-collections/workflows/CodeQL/badge.svg)](https://github.com/apache/commons-collections/actions/workflows/codeql-analysis.yml?query=workflow%3ACodeQL)
+[![CodeQL](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/CodeQL/badge.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/codeql.yaml)
 
 ![example workflow](https://github.com/github/docs/actions/workflows/main.yml/badge.svg)
 ![Validate with hassfest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/Validate/badge.svg?branch=master)
