@@ -1,18 +1,15 @@
-            - name: CodeQL Bundle
-  # You may pin to the exact commit or the version.
-  # uses: advanced-security/codeql-bundle-action@9437ba7f33c2a978c8897fb21b2a7e0809199d20
+- name: CodeQL Bundle
   uses: advanced-security/codeql-bundle-action@v1.1.0
   with:
     # The tag of bundle release to customize (e.g., codeql-bundle-20220311)
-    bundle-version: # optional, default is latest
+    bundle-version: "codeql-bundle-20220311"  # Optional: provide a specific version or leave out for latest
     # A comma-separated list of CodeQL packs to include in the bundle
-    packs: 
+    packs: "codeql/javascript-queries,codeql/python-queries"  # Example: specify packs to include
     # Root directory where the codeql-workspace.yml file is located
-    workspace: # optional, default is .
+    workspace: "."  # Optional: specify a workspace if not the root directory
     # Upload the created bundle
-    upload: # optional, default is true
-    # 
-    token: # optional, default is ${{ github.token }}
+    upload: true  # Optional: specify if the bundle should be uploaded
+    # Token to use for authentication, default is ${{ github.token }}
+    token: ${{ secrets.GITHUB_TOKEN }}  # Optional: explicitly set if different from the default
     # The max number of packs that will be processed concurrently
-    concurrency-limit: # optional, default is 2
-          
+    concurrency-limit: 2  # Optional: set concurrency limit
