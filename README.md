@@ -28,13 +28,10 @@ Component to integrate some ZTE routers as a device trackers in home assistant.
 1. Download the [zte-router](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/latest/download/zte_router.zip)
 2. Place the files of the .zip in your `root directory of homeassistant` (That should only effectivly place files into /custom_components/zte/router)
 3. Restart Homeassistant
-4. Search in "integration" for the ZTE_Router integration and add it to Homeassistant
+4. Search in "integration" for the ZTE Router integration and add it to Homeassistant
 5. Enter the Router IP, password and select the model you have and wait for the integration to install all the device sensors.
 
 ### Installation with HACS
-
-- Click this: [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zte_router)
-
 
 1. Or `HACS` > `Integrations` > `⋮` > `Custom Repositories`
 2. `Repository`: paste the url of this repo
@@ -45,6 +42,8 @@ Component to integrate some ZTE routers as a device trackers in home assistant.
 7. Search for `ZTE router`
 8. Click `Download`
 9. Restart _Home Assistant_
+10. Search in "integration" for the ZTE Router integration and add it to Homeassistant or click this link : [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zte_router)
+11. Enter the Router IP, password and select the model you have and wait for the integration to install all the device sensors.
     
 
 ###  Configuration
