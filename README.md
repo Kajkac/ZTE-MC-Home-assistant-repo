@@ -1,4 +1,5 @@
-![GitHub](https://img.shields.io/github/license/Kajkac/ZTE-MC-Home-assistant-repo)
+![GitHub](https://img.shields.io/github/license/Kajkac/ZTE-MC-Home-assistant-repo?cacheSeconds=1)
+
 ![GitHub Repo stars](https://img.shields.io/github/stars/Kajkac/ZTE-MC-Home-assistant-repo)
 [![GitHub release](https://img.shields.io/github/release/Kajkac/ZTE-MC-Home-assistant-repo.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/)
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
