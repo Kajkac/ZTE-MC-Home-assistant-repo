@@ -14,7 +14,7 @@
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/y/Kajkac/ZTE-MC-Home-assistant-repo)
 ![GitHub commits since tagged version](https://img.shields.io/github/commits-since/juacas/zte_tracker/v1.0.0)
 ![GitHub last commit](https://img.shields.io/github/last-commit/Kajkac/ZTE-MC-Home-assistant-repo)
-![Codecov branch](https://img.shields.io/codecov/c/github/Kajkac/ZTE-MC-Home-assistant-repo/master)
+![Codecov branch](https://img.shields.io/github/Kajkac/ZTE-MC-Home-assistant-repo/master)
 ![installation_badge](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.zte_router.total)
 
 # ZTE Router Integration for Home Assistant
