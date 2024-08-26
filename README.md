@@ -33,7 +33,7 @@ Component to integrate some ZTE routers as a device trackers in home assistant.
 
 ### Installation with HACS
 
-**Method 1:** [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Kajkac&repository=ZTE-MC-Home-assistant-repo&category=integration)
+**Method 1:** [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Kajkac&repository=ZTE-MC-Home-assistant-repo&category=integration) - in prep not working (waiting for HACS PR to be completed)
 
 1. Or `HACS` > `Integrations` > `⋮` > `Custom Repositories`
 2. `Repository`: paste the url of this repo
