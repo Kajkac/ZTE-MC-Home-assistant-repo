@@ -4,7 +4,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 <!-- ![Pytest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/Pytest/badge.svg?branch=master)
 ![CodeQL](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/CodeQL/badge.svg?branch=master) -->
-![Validate with hassfest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/Validate%20with%20hassfest/badge.svg?branch=master)
+![Validate with hassfest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/Validate/badge.svg?branch=master)
 
 ![GitHub contributors](https://img.shields.io/github/contributors/Kajkac/ZTE-MC-Home-assistant-repo)
 ![Maintenance](https://img.shields.io/maintenance/yes/2025)
