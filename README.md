@@ -1,16 +1,35 @@
-**ZTE Home assistant addon**
+![GitHub](https://img.shields.io/github/license/juacas/zte_tracker)
+![GitHub Repo stars](https://img.shields.io/github/stars/juacas/zte_tracker)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/juacas/zte_tracker)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
+<!-- ![Pytest](https://github.com/juacas/zte_tracker/workflows/Pytest/badge.svg?branch=master)
+![CodeQL](https://github.com/juacas/zte_tracker/workflows/CodeQL/badge.svg?branch=master) -->
+![Validate with hassfest](https://github.com/juacas/zte_tracker/workflows/Validate%20with%20hassfest/badge.svg?branch=master)
 
-[![GitHub release](https://img.shields.io/github/release/Kajkac/ZTE-MC-Home-assistant-repo.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/)
-[![GH-downloads](https://img.shields.io/github/downloads/dckiller51/bodymiscale/total?style=flat-square)](https://github.com/dckiller51/bodymiscale/releases)
-[![GH-last-commit](https://img.shields.io/github/last-commit/dckiller51/bodymiscale.svg?style=flat-square)](https://github.com/dckiller51/bodymiscale/commits/main)
-[![GH-code-size](https://img.shields.io/github/languages/code-size/dckiller51/bodymiscale.svg?color=red&style=flat-square)](https://github.com/dckiller51/bodymiscale)
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg?style=flat-square)](https://github.com/hacs)
+![GitHub contributors](https://img.shields.io/github/contributors/juacas/zte_tracker)
+![Maintenance](https://img.shields.io/maintenance/yes/2025)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/y/juacas/zte_tracker)
+![GitHub commits since tagged version](https://img.shields.io/github/commits-since/juacas/zte_tracker/v1.0.0)
+![GitHub last commit](https://img.shields.io/github/last-commit/juacas/zte_tracker)
+<!-- ![Codecov branch](https://img.shields.io/codecov/c/github/juacas/zte_tracker/master) -->
+![installation_badge](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.zte_tracker.total)
+
+# ZTE Router Integration for Home Assistant
+Component to integrate some ZTE routers as a device trackers in home assistant.
+
+=======
 
 ## Installation
 
-### Via HACS
+### Manual Installation
 
-### Option 1: [HACS](https://hacs.xyz/)
+1. Download the [zte-router](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/latest/download/zte_router.zip)
+2. Place the files of the .zip in your `root directory of homeassistant` (That should only effectivly place files into /custom_components/zte/router)
+3. Restart Homeassistant
+4. Search in "integration" for the ZTE_Router integration and add it to Homeassistant
+5. Enter the Router IP, password and select the model you have and wait for the integration to install all the device sensors.
+
+### Installation with HACS
 
 1. Or `HACS` > `Integrations` > `⋮` > `Custom Repositories`
 2. `Repository`: paste the url of this repo
@@ -21,19 +40,9 @@
 7. Search for `ZTE router`
 8. Click `Download`
 9. Restart _Home Assistant_
+    
 
-### Manual installation
-
-### Option 2: Manual copy
-
-Copy the `custom_components/zte_router` of this repo into the path `/config/custom_components/zte_router` of your HA installation.
-
-Restart Home Assistant go to Settings -> integrations -> Add integration 
-Find integration ZTE Router 
-
-Enter the Router IP, password and select the model you have and wait for the integration to install all the device sensors.
-
-## Configuration
+###  Configuration
 
 Supported models : 
 
@@ -54,10 +63,10 @@ The custom integration is located in the `custom_components/zte_router` director
 ## Bugs: 
 
 1. Username currently not supported
-2. Errors in Home assistant log are for now present until i polish the addon 
-2. There are errors for sure but whoever wanna test it let me know
-4. Any sugestion you have please open the bug 
-5. I will push new builds as soon i will have more time
+2. Errors in Home assistant log - They are for now present until i polish the addon 
+2. Various errors in sensors etc. - This integration is classified as beta right now but can be tested by anyone. 
+4. Any suggestion you have please open the issues tab
+5. I will push new builds as soon i will have more time. Make sure you "star" this integration. 
 6. If u wanna donate for beer let me know :P 
 
 ## Contributors
