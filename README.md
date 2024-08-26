@@ -4,7 +4,7 @@
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 
 ![CodeQL](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/codeql-analysis.yml/badge.svg?cacheSeconds=60)
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/Kajkac/ZTE-MC-Home-assistant-repo/codeql-analysis.yml?branch=main&label=checks)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/codeql-analysis.yml)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/Kajkac/ZTE-MC-Home-assistant-repo/codeql.yml?branch=main&label=checks)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/codeql.yml)
 ![Main Build](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/main.yml/badge.svg?cacheSeconds=60)
 ![Validate with hassfest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/hassfest.yml/badge.svg?cacheSeconds=60)
 ![Validate with Hass Action](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/validate.yml/badge.svg?cacheSeconds=60)
