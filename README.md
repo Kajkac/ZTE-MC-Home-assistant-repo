@@ -1,12 +1,12 @@
-![GitHub](https://img.shields.io/github/license/juacas/zte_tracker)
-![GitHub Repo stars](https://img.shields.io/github/stars/juacas/zte_tracker)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/juacas/zte_tracker)
+![GitHub](https://img.shields.io/github/license/Kajkac/ZTE-MC-Home-assistant-repo)
+![GitHub Repo stars](https://img.shields.io/github/stars/Kajkac/ZTE-MC-Home-assistant-repo)
+[![GitHub release](https://img.shields.io/github/release/Kajkac/ZTE-MC-Home-assistant-repo.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/)
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
-<!-- ![Pytest](https://github.com/juacas/zte_tracker/workflows/Pytest/badge.svg?branch=master)
-![CodeQL](https://github.com/juacas/zte_tracker/workflows/CodeQL/badge.svg?branch=master) -->
-![Validate with hassfest](https://github.com/juacas/zte_tracker/workflows/Validate%20with%20hassfest/badge.svg?branch=master)
+<!-- ![Pytest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/Pytest/badge.svg?branch=master)
+![CodeQL](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/CodeQL/badge.svg?branch=master) -->
+![Validate with hassfest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/Validate%20with%20hassfest/badge.svg?branch=master)
 
-![GitHub contributors](https://img.shields.io/github/contributors/juacas/zte_tracker)
+![GitHub contributors](https://img.shields.io/github/contributors/Kajkac/ZTE-MC-Home-assistant-repo)
 ![Maintenance](https://img.shields.io/maintenance/yes/2025)
 ![GitHub commit activity](https://img.shields.io/github/commit-activity/y/juacas/zte_tracker)
 ![GitHub commits since tagged version](https://img.shields.io/github/commits-since/juacas/zte_tracker/v1.0.0)
