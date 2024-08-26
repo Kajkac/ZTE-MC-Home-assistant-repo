@@ -3,7 +3,7 @@
 [![GitHub release](https://img.shields.io/github/release/Kajkac/ZTE-MC-Home-assistant-repo.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/)
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 
-[![CodeQL](https://github.com/apache/commons-collections/workflows/CodeQL/badge.svg)](https://github.com/apache/commons-collections/actions/workflows/codeql.yml?query=workflow%3ACodeQL)
+[![CodeQL](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/CodeQL/badge.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/codeql.yml?query=workflow%3ACodeQL)
 ![example workflow](https://github.com/github/docs/actions/workflows/main.yml/badge.svg)
 ![Validate with hassfest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/workflows/Validate/badge.svg?branch=master)
 
