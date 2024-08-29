@@ -109,7 +109,7 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
         _LOGGER.info("Starting _async_update_data in DataUpdateCoordinator at %s", datetime.now())
         try:
             # Add an 8-second delay before executing the script
-            await asyncio.sleep(8)
+            await asyncio.sleep(4)
             # Offload the blocking function to a thread
             data = await self.hass.async_add_executor_job(
                 self.run_mc_script, self.ip_entry, self.password_entry, 7
@@ -161,7 +161,7 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
         _LOGGER.info("Starting _async_update_data in SMSUpdateCoordinator at %s", datetime.now())
         try:
             # Add a 5-second delay before executing the script
-            await asyncio.sleep(5)
+            await asyncio.sleep(3)
             # Offload the blocking function to a thread
             data = await self.hass.async_add_executor_job(
                 self.run_mc_script, self.ip_entry, self.password_entry, 6

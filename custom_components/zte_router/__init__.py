@@ -5,12 +5,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import async_get as async_get_device_registry
 from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
-from homeassistant.components.http import HomeAssistantView
 from .const import DOMAIN, MANUFACTURER, MODEL
 from .sensor import ZTERouterDataUpdateCoordinator, ZTERouterSMSUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up ZTE Router from a config entry."""
@@ -37,11 +35,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await coordinator.async_refresh()
     firmware_version = coordinator.data.get("wa_inner_version", "Unknown")
 
-    # Forward entry setup to relevant platforms
-    await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "switch"])
+    # Forward entry setup to relevant platforms, including button
+    await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "switch", "button"])
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
-
 
     # Register the device in the device registry
     device_registry = async_get_device_registry(hass)
@@ -60,7 +57,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     # Find the entity_id for a specific sensor, e.g., "sensor.last_sms"
     sensor_entity_id = None
-    switch_entity_id = "switch.send_sms_50gb"
 
     for entity in entity_registry.entities.values():
         if entity.device_id == device.id and entity.platform == DOMAIN:
@@ -92,9 +88,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             ],
             "action": [
                 {
-                    "service": "switch.turn_on",
+                    "service": "button.press",  # Updated service for button entity
                     "target": {
-                        "entity_id": switch_entity_id
+                        "entity_id": "button.send_sms_50gb"
                     }
                 }
             ],
@@ -120,9 +116,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             ],
             "action": [
                 {
-                    "service": "switch.turn_on",
+                    "service": "button.press",  # Updated service for button entity
                     "target": {
-                        "entity_id": "switch.delete_all_sms"
+                        "entity_id": "button.delete_all_sms"
                     }
                 }
             ],
@@ -141,9 +137,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             "condition": [],
             "action": [
                 {
-                    "service": "switch.toggle",
+                    "service": "button.press",  # Updated service for button entity
                     "target": {
-                        "entity_id": "switch.reboot_router"
+                        "entity_id": "button.reboot_router"
                     }
                 }
             ],
@@ -210,6 +206,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Unload a config entry."""
     await hass.config_entries.async_forward_entry_unload(entry, "sensor")
     await hass.config_entries.async_forward_entry_unload(entry, "switch")
+    await hass.config_entries.async_forward_entry_unload(entry, "button")
     hass.data[DOMAIN].pop(entry.entry_id)
     return True
 
