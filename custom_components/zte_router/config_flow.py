@@ -34,6 +34,9 @@ class ZTERouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
+            # Add router_type to the user_input data
+            user_input["router_type"] = self.selected_router_type
+
             # Proceed with creating the entry after validation
             return self.async_create_entry(title=user_input["router_ip"], data=user_input)
 

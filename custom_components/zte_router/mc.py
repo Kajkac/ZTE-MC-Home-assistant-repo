@@ -79,15 +79,26 @@ class zteRouter:
         ztePass = self.hash(hashPassword + LD).upper()
         old_login = self.getVersion()
 
+        # Correct the logic here
+        if username is not None and username != "":
+            goform_id = 'LOGIN_MULTI_USER'
+        else:
+            goform_id = 'LOGIN'
+
         payload = {
             'isTest': 'false',
-            'goformId': 'LOGIN' if username is not None and old_login in 'MC801' or 'MC7010' else 'LOGIN_MULTI_USER',
+            'goformId': goform_id,
             'password': ztePass
         }
+
         if username is not None and username != "":
             payload['username'] = username
 
         r = s.post(self.referer + "goform/goform_set_cmd_process", headers=header, data=payload, verify=False)
+        
+        if r.status_code != 200 or "stok" not in r.cookies:
+            raise ValueError("Failed to obtain a valid cookie from the router")
+
         return "stok=" + r.cookies["stok"].strip('\"')
 
     def get_RD(self):
