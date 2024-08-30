@@ -21,6 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     ip_entry = entry.data["router_ip"]
     password_entry = entry.data["router_password"]
+    username_entry = entry.data.get("router_username") if entry.data.get("router_type") in ["MC888A", "MC889A"] else None
     ping_interval = entry.data.get("ping_interval", 60)
     sms_check_interval = entry.data.get("sms_check_interval", 100)
     router_type = entry.data.get("router_type", "MC801A")
@@ -36,8 +37,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     else:
         disabled_sensors = DISABLED_SENSORS_MC801A
 
-    coordinator = ZTERouterDataUpdateCoordinator(hass, ip_entry, password_entry, ping_interval)
-    sms_coordinator = ZTERouterSMSUpdateCoordinator(hass, ip_entry, password_entry, sms_check_interval)
+    coordinator = ZTERouterDataUpdateCoordinator(hass, ip_entry, password_entry, username_entry, ping_interval)
+    sms_coordinator = ZTERouterSMSUpdateCoordinator(hass, ip_entry, password_entry, username_entry, sms_check_interval)
 
     await coordinator.async_refresh()
     await sms_coordinator.async_refresh()
@@ -53,7 +54,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     # Add new dynamic set of sensors
     dynamic_data = await hass.async_add_executor_job(
-        coordinator.run_mc_script, ip_entry, password_entry, 3
+        coordinator.run_mc_script, ip_entry, password_entry, username_entry, 3
     )
     _LOGGER.debug(f"Data for command 3: {dynamic_data}")
     dynamic_data = json.loads(dynamic_data)
@@ -64,7 +65,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 
     # Add the new sensor for command 6
     additional_data = await hass.async_add_executor_job(
-        coordinator.run_mc_script, ip_entry, password_entry, 6
+        coordinator.run_mc_script, ip_entry, password_entry, username_entry, 6
     )
     _LOGGER.debug(f"Data for command 6: {additional_data}")
     additional_data = json.loads(additional_data)
@@ -93,9 +94,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(sensors, True)
 
 class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass, ip_entry, password_entry, ping_interval):
+    def __init__(self, hass, ip_entry, password_entry, username_entry, ping_interval):
         self.ip_entry = ip_entry
         self.password_entry = password_entry
+        self.username_entry = username_entry if username_entry else ""
         self._data = {}
         _LOGGER.info(f"Initializing DataUpdateCoordinator with ping interval: {ping_interval} seconds")
         super().__init__(
@@ -112,7 +114,7 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
             await asyncio.sleep(4)
             # Offload the blocking function to a thread
             data = await self.hass.async_add_executor_job(
-                self.run_mc_script, self.ip_entry, self.password_entry, 7
+                self.run_mc_script, self.ip_entry, self.password_entry, self.username_entry, 7
             )
             _LOGGER.debug(f"Data received from mc.py script: {data}")
             self._data.update(json.loads(data))
@@ -121,17 +123,22 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error(f"Error during _async_update_data: {err}")
             return self._data
 
-    def run_mc_script(self, ip, password, command, retries=3, delay=2):
+    def run_mc_script(self, ip, password, username, command, retries=3, delay=2):
         attempt = 0
         while attempt < retries:
             _LOGGER.info(f"Running mc.py script for command {command}, attempt {attempt + 1}")
             try:
-                result = subprocess.run(
-                    ["python3", "/config/custom_components/zte_router/mc.py", ip, password, str(command)],
-                    capture_output=True,
-                    text=True,
-                    check=True
-                )
+                # Ensure username is a string; use an empty string if None
+                username = username or ""
+                cmd = [
+                    "python3",
+                    "/config/custom_components/zte_router/mc.py",
+                    ip,
+                    password,
+                    str(command),
+                    username  # Include username if applicable
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
                 _LOGGER.debug(f"Output for command {command}: {result.stdout}")
                 return result.stdout
             except subprocess.CalledProcessError as e:
@@ -145,9 +152,10 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
                     raise
 
 class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass, ip_entry, password_entry, sms_check_interval):
+    def __init__(self, hass, ip_entry, password_entry, username_entry, sms_check_interval):
         self.ip_entry = ip_entry
         self.password_entry = password_entry
+        self.username_entry = username_entry if username_entry else ""
         self._data = {}
         _LOGGER.info(f"Initializing SMSUpdateCoordinator with SMS check interval: {sms_check_interval} seconds")
         super().__init__(
@@ -160,11 +168,9 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         _LOGGER.info("Starting _async_update_data in SMSUpdateCoordinator at %s", datetime.now())
         try:
-            # Add a 5-second delay before executing the script
-            await asyncio.sleep(3)
             # Offload the blocking function to a thread
             data = await self.hass.async_add_executor_job(
-                self.run_mc_script, self.ip_entry, self.password_entry, 6
+                self.run_mc_script, self.ip_entry, self.password_entry, self.username_entry, 6
             )
             _LOGGER.debug(f"SMS data received from mc.py script: {data}")
             self._data.update(json.loads(data))
@@ -173,15 +179,20 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error(f"Error during _async_update_data (SMS): {err}")
             return self._data
 
-    def run_mc_script(self, ip, password, command):
+    def run_mc_script(self, ip, password, username, command):
         _LOGGER.info(f"Running mc.py script for SMS command {command}")
         try:
-            result = subprocess.run(
-                ["python3", "/config/custom_components/zte_router/mc.py", ip, password, str(command)],
-                capture_output=True,
-                text=True,
-                check=True
-            )
+            # Ensure username is a string; use an empty string if None
+            username = username or ""
+            cmd = [
+                "python3",
+                "/config/custom_components/zte_router/mc.py",
+                ip,
+                password,
+                str(command),
+                username  # Include username if applicable
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             _LOGGER.debug(f"Output for SMS command {command}: {result.stdout}")
             return result.stdout
         except subprocess.CalledProcessError as e:

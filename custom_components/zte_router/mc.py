@@ -35,9 +35,10 @@ def gsm_encode(plaintext):
     return binascii.hexlify(res)
 
 class zteRouter:
-    def __init__(self, ip, password):
+    def __init__(self, ip, username, password):
         self.ip = ip
         self.protocol = "http"  # default to http
+        self.username = username
         self.password = password
         self.try_set_protocol()
         self.referer = f"{self.protocol}://{self.ip}/"
@@ -72,11 +73,20 @@ class zteRouter:
         r = s.get(self.referer + f"goform/goform_get_cmd_process?{payload}", headers=header, data=payload, verify=False)
         return r.json()["LD"].upper()
 
-    def getCookie(self, password, LD):
+    def getCookie(self, username, password, LD):
         header = {"Referer": self.referer}
         hashPassword = self.hash(password).upper()
         ztePass = self.hash(hashPassword + LD).upper()
-        payload = "isTest=false&goformId=LOGIN&password=" + ztePass
+        old_login = self.getVersion()
+
+        payload = {
+            'isTest': 'false',
+            'goformId': 'LOGIN' if username is not None and old_login in 'MC801' or 'MC7010' else 'LOGIN_MULTI_USER',
+            'password': ztePass
+        }
+        if username is not None and username != "":
+            payload['username'] = username
+
         r = s.post(self.referer + "goform/goform_set_cmd_process", headers=header, data=payload, verify=False)
         return "stok=" + r.cookies["stok"].strip('\"')
 
@@ -131,7 +141,7 @@ class zteRouter:
 
     def zteinfo(self):
         ip = self.ip
-        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
         cmd_url = f"{self.protocol}://{self.ip}/goform/goform_get_cmd_process?isTest=false&cmd=wa_inner_version%2Ccr_version%2Cnetwork_type%2Crssi%2Crscp%2Crmcc%2Crmnc%2Cenodeb_id%2Clte_rsrq%2Clte_rsrp%2CZ5g_snr%2CZ5g_rsrp%2CZCELLINFO_band%2CZ5g_dlEarfcn%2Clte_ca_pcell_arfcn%2Clte_ca_pcell_band%2Clte_ca_scell_band%2Clte_ca_pcell_bandwidth%2Clte_ca_scell_info%2Clte_ca_scell_bandwidth%2Cwan_lte_ca%2Clte_pci%2CZ5g_CELL_ID%2CZ5g_SINR%2Ccell_id%2Cwan_lte_ca%2Clte_ca_pcell_band%2Clte_ca_pcell_bandwidth%2Clte_ca_scell_band%2Clte_ca_scell_bandwidth%2Clte_ca_pcell_arfcn%2Clte_ca_scell_arfcn%2Clte_multi_ca_scell_info%2Cwan_active_band%2Cnr5g_pci%2Cnr5g_action_band%2Cnr5g_cell_id%2Clte_snr%2Cecio%2Cwan_active_channel%2Cnr5g_action_channel%2Cngbr_cell_info%2Cmonthly_tx_bytes%2Cmonthly_rx_bytes%2Clte_pci%2Clte_pci_lock%2Clte_earfcn_lock%2Cwan_ipaddr%2Cwan_apn%2Cpm_sensor_mdm%2Cpm_modem_5g%2Cnr5g_pci%2Cnr5g_action_channel%2Cnr5g_action_band%2CZ5g_SINR%2CZ5g_rsrp%2Cwan_active_band%2Cwan_active_channel%2Cwan_lte_ca%2Clte_multi_ca_scell_info%2Ccell_id%2Cdns_mode%2Cprefer_dns_manual%2Cstandby_dns_manual%2Cnetwork_type%2Crmcc%2Crmnc%2Clte_rsrq%2Clte_rssi%2Clte_rsrp%2Clte_snr%2Cwan_lte_ca%2Clte_ca_pcell_band%2Clte_ca_pcell_bandwidth%2Clte_ca_scell_band%2Clte_ca_scell_bandwidth%2Clte_ca_pcell_arfcn%2Clte_ca_scell_arfcn%2Cwan_ipaddr%2Cstatic_wan_ipaddr%2Copms_wan_mode%2Copms_wan_auto_mode%2Cppp_status%2Cloginfo%2Crealtime_time%2Csignalbar&multi_data=1"
         headers = {
             "Host": ip,
@@ -145,7 +155,7 @@ class zteRouter:
 
     def zteinfo2(self):
         ip = self.ip
-        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
         cmd_url = f"{self.protocol}://{self.ip}/goform/goform_get_cmd_process?multi_data=1&isTest=false&sms_received_flag_flag=0&sts_received_flag_flag=0&cmd=network_type%2Crssi%2Clte_rssi%2Crscp%2Clte_rsrp%2CZ5g_snr%2CZ5g_rsrp%2CZCELLINFO_band%2CZ5g_dlEarfcn%2Clte_ca_pcell_arfcn%2Clte_ca_pcell_band%2Clte_ca_scell_band%2Clte_ca_pcell_bandwidth%2Clte_ca_scell_info%2Clte_ca_scell_bandwidth%2Cwan_lte_ca%2Clte_pci%2CZ5g_CELL_ID%2CZ5g_SINR%2Ccell_id%2Cwan_lte_ca%2Clte_ca_pcell_band%2Clte_ca_pcell_bandwidth%2Clte_ca_scell_band%2Clte_ca_scell_bandwidth%2Clte_ca_pcell_arfcn%2Clte_ca_scell_arfcn%2Clte_multi_ca_scell_info%2Cwan_active_band%2Cnr5g_pci%2Cnr5g_action_band%2Cnr5g_cell_id%2Clte_snr%2Cecio%2Cwan_active_channel%2Cnr5g_action_channel%2Cmodem_main_state%2Cpin_status%2Copms_wan_mode%2Copms_wan_auto_mode%2Cloginfo%2Cnew_version_state%2Ccurrent_upgrade_state%2Cis_mandatory%2Cwifi_dfs_status%2Cbattery_value%2Cppp_dial_conn_fail_counter%2Cwifi_chip1_ssid1_auth_mode%2Cwifi_chip2_ssid1_auth_mode%2Csignalbar%2Cnetwork_type%2Cnetwork_provider%2Cppp_status%2Csimcard_roam%2Cspn_name_data%2Cspn_b1_flag%2Cspn_b2_flag%2Cwifi_onoff_state%2Cwifi_chip1_ssid1_ssid%2Cwifi_chip2_ssid1_ssid%2Cwan_lte_ca%2Cmonthly_tx_bytes%2Cmonthly_rx_bytes%2Cpppoe_status%2Cdhcp_wan_status%2Cstatic_wan_status%2Crmcc%2Crmnc%2Cmdm_mcc%2Cmdm_mnc%2CEX_SSID1%2Csta_ip_status%2CEX_wifi_profile%2Cm_ssid_enable%2CRadioOff%2Cwifi_chip1_ssid1_access_sta_num%2Cwifi_chip2_ssid1_access_sta_num%2Clan_ipaddr%2Cstation_mac%2Cwifi_access_sta_num%2Cbattery_charging%2Cbattery_vol_percent%2Cbattery_pers%2Crealtime_tx_bytes%2Crealtime_rx_bytes%2Crealtime_time%2Crealtime_tx_thrpt%2Crealtime_rx_thrpt%2Cmonthly_time%2Cdate_month%2Cdata_volume_limit_switch%2Cdata_volume_limit_size%2Cdata_volume_alert_percent%2Cdata_volume_limit_unit%2Croam_setting_option%2Cupg_roam_switch%2Cssid%2Cwifi_enable%2Cwifi_5g_enable%2Ccheck_web_conflict%2Cdial_mode%2Cprivacy_read_flag%2Cis_night_mode%2Cvpn_conn_status%2Cwan_connect_status%2Csms_received_flag%2Csts_received_flag%2Csms_unread_num%2Cwifi_chip1_ssid2_access_sta_num%2Cwifi_chip2_ssid2_access_sta_num&multi_data=1"
         headers = {
             "Host": ip,
@@ -159,7 +169,7 @@ class zteRouter:
 
     def zteinfo3(self):
         ip = self.ip
-        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
         cmd_url = f"{self.protocol}://{self.ip}/goform/goform_get_cmd_process?isTest=false&multi_data=1&sms_received_flag_flag=0&sts_received_flag_flag=0&cmd=wa_inner_version%2Ccr_version%2Cnetwork_type%2Crssi%2Crscp%2Crmcc%2Crmnc%2Cenodeb_id%2Clte_rsrq%2Clte_rsrp%2CZ5g_snr%2CZ5g_rsrp%2CZCELLINFO_band%2CZ5g_dlEarfcn%2Clte_ca_pcell_arfcn%2Clte_ca_pcell_band%2Clte_ca_scell_band%2Clte_ca_pcell_bandwidth%2Clte_ca_scell_info%2Clte_ca_scell_bandwidth%2Cwan_lte_ca%2Clte_pci%2CZ5g_CELL_ID%2CZ5g_SINR%2Ccell_id%2Clte_ca_scell_arfcn%2Clte_multi_ca_scell_info%2Cwan_active_band%2Cnr5g_pci%2Cnr5g_action_band%2Cnr5g_cell_id%2Clte_snr%2Cecio%2Cwan_active_channel%2Cnr5g_action_channel%2Cngbr_cell_info%2Cmonthly_tx_bytes%2Cmonthly_rx_bytes%2Clte_pci_lock%2Clte_earfcn_lock%2Cwan_ipaddr%2Cwan_apn%2Cpm_sensor_mdm%2Cpm_modem_5g%2Cmodem_main_state%2Cpin_status%2Copms_wan_mode%2Copms_wan_auto_mode%2Cloginfo%2Cnew_version_state%2Ccurrent_upgrade_state%2Cis_mandatory%2Cwifi_dfs_status%2Cbattery_value%2Cppp_dial_conn_fail_counter%2Cwifi_chip1_ssid1_auth_mode%2Cwifi_chip2_ssid1_auth_mode%2Cnetwork_provider%2Csimcard_roam%2Cspn_name_data%2Cspn_b1_flag%2Cspn_b2_flag%2Cwifi_onoff_state%2Cwifi_chip1_ssid1_ssid%2Cwifi_chip2_ssid1_ssid%2Cpppoe_status%2Cdhcp_wan_status%2Cstatic_wan_status%2Cmdm_mcc%2Cmdm_mnc%2CEX_SSID1%2Csta_ip_status%2CEX_wifi_profile%2Cm_ssid_enable%2CRadioOff%2Cwifi_chip1_ssid1_access_sta_num%2Cwifi_chip2_ssid1_access_sta_num%2Clan_ipaddr%2Cstation_mac%2Cwifi_access_sta_num%2Cbattery_charging%2Cbattery_vol_percent%2Cbattery_pers%2Crealtime_tx_bytes%2Crealtime_rx_bytes%2Crealtime_time%2Crealtime_tx_thrpt%2Crealtime_rx_thrpt%2Cmonthly_time%2Cdate_month%2Cdata_volume_limit_switch%2Cdata_volume_limit_size%2Cdata_volume_alert_percent%2Cdata_volume_limit_unit%2Croam_setting_option%2Cupg_roam_switch%2Cssid%2Cwifi_enable%2Cwifi_5g_enable%2Ccheck_web_conflict%2Cdial_mode%2Cprivacy_read_flag%2Cis_night_mode%2Cvpn_conn_status%2Cwan_connect_status%2Csms_received_flag%2Csts_received_flag%2Csms_unread_num%2Cwifi_chip1_ssid2_access_sta_num%2Cwifi_chip2_ssid2_access_sta_num%2Cstatic_wan_ipaddr%2Cdns_mode%2Cprefer_dns_manual%2Cstandby_dns_manual%2Csignalbar%2Cppp_status"
 
         headers = {
@@ -176,7 +186,7 @@ class zteRouter:
 
     def ztesmsinfo(self):
         ip = self.ip
-        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
         cmd_url = f"{self.protocol}://{self.ip}/goform/goform_get_cmd_process?isTest=false&cmd=sms_capacity_info"
         headers = {
             "Host": ip,
@@ -202,7 +212,7 @@ class zteRouter:
         return json.dumps(data)
 
     def ztereboot(self):
-        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
         AD = self.get_AD()
         header = {"Referer": self.referer, "Cookie": cookie}
         payload = f'isTest=false&goformId=REBOOT_DEVICE&AD=' + AD
@@ -211,7 +221,7 @@ class zteRouter:
         return r.status_code
 
     def deletesms(self, msg_id):
-        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
         AD = self.get_AD()
         header = {"Referer": self.referer, "Cookie": cookie}
         payload = f'isTest=false&goformId=DELETE_SMS&msg_id={msg_id}&AD=' + AD
@@ -220,7 +230,7 @@ class zteRouter:
         return r.status_code
 
     def parsesms(self):
-        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
         header = {"Referer": self.referer, "Cookie": cookie}
         payload = f'cmd=sms_data_total&page=0&data_per_page=5000&mem_store=1&tags=10&order_by=order+by+id+desc'
         r = s.post(self.referer + "goform/goform_get_cmd_process", headers=header, data=payload, verify=False)
@@ -245,7 +255,7 @@ class zteRouter:
         return json.dumps(smslist, indent=2)
         
     def connect_data(self):
-        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
         AD = self.get_AD()
         header = {"Referer": self.referer, "Cookie": cookie}
         payload = f'isTest=false&goformId=CONNECT_NETWORK&AD=' + AD
@@ -254,7 +264,7 @@ class zteRouter:
         return r.status_code
 
     def disconnect_data(self):
-        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
         AD = self.get_AD()
         header = {"Referer": self.referer, "Cookie": cookie}
         payload = f'isTest=false&goformId=DISCONNECT_NETWORK&AD=' + AD
@@ -263,7 +273,7 @@ class zteRouter:
         return r.status_code
 
     def setdata_5G_SA(self):
-        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
         AD = self.get_AD()
         header = {"Referer": self.referer, "Cookie": cookie}
         payload = f'isTest=false&goformId=Only_5G&AD=' + AD
@@ -273,7 +283,7 @@ class zteRouter:
         return r.status_code
         
     def setdata_5G_NSA(self):
-        cookie = self.getCookie(password=self.password, LD=self.get_LD())
+        cookie = self.getCookie(username=self.username, password=self.password, LD=self.get_LD())
         AD = self.get_AD()
         header = {"Referer": self.referer, "Cookie": cookie}
         payload = f'isTest=false&goformId=SET_BEARER_PREFERENCE&BearerPreference=LTE_AND_5G&AD=' + AD
@@ -296,8 +306,9 @@ if __name__ == "__main__":
     ip = sys.argv[1]
     password = sys.argv[2]
     command = int(sys.argv[3])
+    username = sys.argv[4]
 
-    zte = zteRouter(ip, password)
+    zte = zteRouter(ip, username, password)
     result = None
     if command == 1:
         result = zte.zteinfo()
@@ -355,8 +366,3 @@ if __name__ == "__main__":
         result = zte.setdata_5G_NSA()
     if result and command != 6:
         print(result)
-
-
-
-
-

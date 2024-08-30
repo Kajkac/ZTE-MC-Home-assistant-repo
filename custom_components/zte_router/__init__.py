@@ -19,9 +19,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     ping_interval = config.get("ping_interval", 60)
     sms_check_interval = config.get("sms_check_interval", 100)
+    router_type = config.get("router_type", "MC801A")
+    username = config.get("router_username") if router_type in ["MC888A", "MC889A"] else None
 
-    coordinator = ZTERouterDataUpdateCoordinator(hass, config["router_ip"], config["router_password"], ping_interval)
-    sms_coordinator = ZTERouterSMSUpdateCoordinator(hass, config["router_ip"], config["router_password"], sms_check_interval)
+    # Initialize coordinators with username if applicable
+    coordinator = ZTERouterDataUpdateCoordinator(hass, config["router_ip"], config["router_password"], username, ping_interval)
+    sms_coordinator = ZTERouterSMSUpdateCoordinator(hass, config["router_ip"], config["router_password"], username, sms_check_interval)
 
     await coordinator.async_config_entry_first_refresh()
     await sms_coordinator.async_config_entry_first_refresh()
@@ -72,7 +75,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         {
             "id": f"{DOMAIN}_automatic_sms_sender_{entry.entry_id}",
             "alias": f"Automatic SMS Sender T-Mobile HR {ip_address}",
-            "initial_state": False,
+            "initial_state": None,  # Updated to None
             "trigger": [
                 {
                     "platform": "time_pattern",
@@ -99,7 +102,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         {
             "id": f"{DOMAIN}_clean_sms_memory_{entry.entry_id}",
             "alias": f"Clean SMS Memory {ip_address}",
-            "initial_state": False,
+            "initial_state": None,  # Updated to None
             "trigger": [
                 {
                     "platform": "state",
@@ -127,7 +130,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         {
             "id": f"{DOMAIN}_zte_reboot_7hrs_{entry.entry_id}",
             "alias": f"ZTE Reboot 7hrs {ip_address}",
-            "initial_state": False,
+            "initial_state": None,  # Updated to None
             "trigger": [
                 {
                     "platform": "time",
@@ -172,6 +175,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
             for automation_config in automations_config:
                 alias = automation_config["alias"]
+                # Check if automation already exists
+                existing_automation = next((a for a in automations if a.get("alias") == alias), None)
+                if existing_automation:
+                    # Preserve the existing initial_state if the automation already exists
+                    automation_config["initial_state"] = existing_automation.get("initial_state")
+                else:
+                    # Do not set initial_state at all if automation is new
+                    # Let Home Assistant handle the default state
+                    automation_config.pop("initial_state", None)
+
                 # Remove any existing automation with the same alias
                 automations = [a for a in automations if a.get("alias") != alias]
                 automations.append(automation_config)
