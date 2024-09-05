@@ -57,7 +57,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         coordinator.run_mc_script, ip_entry, password_entry, username_entry, 3
     )
     _LOGGER.debug(f"Data for command 3: {dynamic_data}")
-    dynamic_data = json.loads(dynamic_data)
+    try:
+        dynamic_data_json = extract_json(dynamic_data)
+        dynamic_data = json.loads(dynamic_data_json)
+    except json.JSONDecodeError as e:
+        _LOGGER.error(f"Failed to parse JSON data for command 3: {e}")
+        dynamic_data = {}
+
     coordinator._data.update(dynamic_data)  # Update coordinator's data with dynamic data
     for key in dynamic_data.keys():
         name = SENSOR_NAMES.get(key, key)
@@ -68,7 +74,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         coordinator.run_mc_script, ip_entry, password_entry, username_entry, 6
     )
     _LOGGER.debug(f"Data for command 6: {additional_data}")
-    additional_data = json.loads(additional_data)
+    try:
+        additional_data_json = extract_json(additional_data)
+        additional_data = json.loads(additional_data_json)
+    except json.JSONDecodeError as e:
+        _LOGGER.error(f"Failed to parse JSON data for command 6: {e}")
+        additional_data = {}
+
     coordinator._data.update(additional_data)  # Update coordinator's data with additional data
     for key in additional_data.keys():
         name = SENSOR_NAMES.get(key, key)
@@ -92,6 +104,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     _LOGGER.info(f"Diagnostics sensors: {[sensor.name for sensor in sensors if sensor.is_diagnostics]}")
 
     async_add_entities(sensors, True)
+
+def extract_json(output):
+    """Extract the JSON data from the output."""
+    try:
+        json_data = output[output.index('{'):output.rindex('}')+1]
+        return json_data
+    except ValueError as e:
+        _LOGGER.error(f"Failed to extract JSON: {e}")
+        return "{}"
 
 class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(self, hass, ip_entry, password_entry, username_entry, ping_interval):
@@ -117,7 +138,8 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
                 self.run_mc_script, self.ip_entry, self.password_entry, self.username_entry, 7
             )
             _LOGGER.debug(f"Data received from mc.py script: {data}")
-            self._data.update(json.loads(data))
+            json_data = extract_json(data)
+            self._data.update(json.loads(json_data))
             return self._data
         except Exception as err:
             _LOGGER.error(f"Error during _async_update_data: {err}")
@@ -173,7 +195,8 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
                 self.run_mc_script, self.ip_entry, self.password_entry, self.username_entry, 6
             )
             _LOGGER.debug(f"SMS data received from mc.py script: {data}")
-            self._data.update(json.loads(data))
+            json_data = extract_json(data)
+            self._data.update(json.loads(json_data))
             return self._data
         except Exception as err:
             _LOGGER.error(f"Error during _async_update_data (SMS): {err}")
