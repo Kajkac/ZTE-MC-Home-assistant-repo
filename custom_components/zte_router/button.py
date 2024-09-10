@@ -1,4 +1,5 @@
 import logging
+import asyncio  # Add this at the top if not already imported
 import subprocess
 from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -61,7 +62,25 @@ class ZTERouterButton(CoordinatorEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self.hass.async_add_executor_job(self._execute_command)
+        _LOGGER.info(f"Button '{self._name}' was pressed. Executing command: {self._command}")
+        
+        # Execute the button's associated command
+        try:
+            await self.hass.async_add_executor_job(self._execute_command)
+            _LOGGER.info(f"Command '{self._command}' executed successfully for button '{self._name}'")
+        except Exception as e:
+            _LOGGER.error(f"Error executing command '{self._command}' for button '{self._name}': {e}")
+            return  # Exit early if there's an error
+
+        # Wait for 3 seconds to ensure the command is completed
+        _LOGGER.info(f"Waiting 2 seconds before refreshing sensors for button '{self._name}'")
+        await asyncio.sleep(2)
+
+        # Trigger data update for all relevant sensors (e.g., LastSMSSensor)
+        _LOGGER.info(f"Triggering data update for sensors related to button '{self._name}'")
+        await self.coordinator.async_request_refresh()
+        _LOGGER.info(f"Data update triggered for button '{self._name}'")
+
 
     def _execute_command(self):
         """Run the mc.py script with the specified command."""
