@@ -2,15 +2,31 @@
     "config": {
         "step": {
             "user": {
+                "title": "Select Router Model",
+                "description": "Please select your router model.",
+                "data": {
+                    "router_type": "Router Model"
+                }
+            },
+            "config": {
                 "title": "Configure ZTE Router",
                 "description": "Please enter the required information to set up the ZTE Router integration.",
                 "data": {
                     "router_ip": "Router IP",
                     "router_password": "Router Password",
-                    "router_username": "Router Username (in development!)",
+                    "router_username": "Router Username (if applicable)",
                     "ping_interval": "Ping Interval (seconds)",
                     "sms_check_interval": "SMS Check Interval (seconds)",
-                    "monthly_usage_threshold": "Monthly Usage Threshold (GB)"
+                    "monthly_usage_threshold": "Monthly Usage Threshold (GB)",
+                    "phone_number": "Phone Number",
+                    "sms_message": "SMS Message",
+                    "phone_number_1": "Phone Number 1",
+                    "message_1": "Message 1",
+                    "phone_number_2": "Phone Number 2",
+                    "message_2": "Message 2",
+                    "create_automation_sms": "Create SMS Automation",
+                    "create_automation_clean": "Create Clean SMS Memory Automation",
+                    "create_automation_reboot": "Create Reboot Automation"
                 }
             }
         },
@@ -25,10 +41,19 @@
                 "data": {
                     "router_ip": "Router IP",
                     "router_password": "Router Password",
-                    "router_username": "Router Username (in development!)",
+                    "router_username": "Router Username (if applicable)",
                     "ping_interval": "Ping Interval (seconds)",
                     "sms_check_interval": "SMS Check Interval (seconds)",
-                    "monthly_usage_threshold": "Monthly Usage Threshold (GB)"
+                    "monthly_usage_threshold": "Monthly Usage Threshold (GB)",
+                    "phone_number": "Phone Number",
+                    "sms_message": "SMS Message",
+                    "phone_number_1": "Phone Number 1",
+                    "message_1": "Message 1",
+                    "phone_number_2": "Phone Number 2",
+                    "message_2": "Message 2",
+                    "create_automation_sms": "Create SMS Automation",
+                    "create_automation_clean": "Create Clean SMS Memory Automation",
+                    "create_automation_reboot": "Create Reboot Automation"
                 }
             }
         }

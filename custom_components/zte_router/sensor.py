@@ -108,11 +108,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
 def extract_json(output):
     """Extract the JSON data from the output."""
     try:
+        _LOGGER.debug(f"Raw output before JSON extraction: {output}")
         json_data = output[output.index('{'):output.rindex('}')+1]
         return json_data
     except ValueError as e:
         _LOGGER.error(f"Failed to extract JSON: {e}")
+        _LOGGER.debug(f"Raw output that caused the error: {output}")
         return "{}"
+
 
 class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(self, hass, ip_entry, password_entry, username_entry, ping_interval):
@@ -312,11 +315,12 @@ class LastSMSSensor(ZTERouterEntity):
     def __init__(self, coordinator, sms_data, disabled_by_default=False):
         self.coordinator = coordinator
         self._name = "Last SMS"
-        self._state = sms_data.get("content", "NO DATA")  # Default to "NO DATA" if content is not available
-        self._attributes = {k: v for k, v in sms_data.items() if k != "content"}
+        self._state = sms_data.get("id", "NO DATA")  # Set the state to the SMS ID
+        self._attributes = {k: v for k, v in sms_data.items() if k != "id"}  # Store all other attributes except the ID
+        self._attributes["content"] = sms_data.get("content", "NO CONTENT")  # Move content to attributes
         self.entity_registry_enabled_default = not disabled_by_default
         self._attr_should_poll = False  # Disable default polling
-        _LOGGER.info(f"Initializing Last SMS sensor with state: {self._state}")
+        _LOGGER.info(f"Initializing Last SMS sensor with state: {self._state} (SMS ID)")
 
         # Parse and format the date attribute
         if "date" in self._attributes:
@@ -328,7 +332,7 @@ class LastSMSSensor(ZTERouterEntity):
 
     @property
     def state(self):
-        return self._state
+        return self._state  # Now returning the SMS ID as the state
 
     @property
     def unique_id(self):
@@ -351,7 +355,7 @@ class LastSMSSensor(ZTERouterEntity):
 
     @property
     def extra_state_attributes(self):
-        return self._attributes
+        return self._attributes  # Return the content and other attributes
 
     @property
     def is_diagnostics(self):
@@ -369,12 +373,13 @@ class LastSMSSensor(ZTERouterEntity):
         old_state = self._state
         _LOGGER.debug(f"Updating LastSMS sensor with new data: {self.coordinator.data}")
         data = self.coordinator.data
-        if data and "content" in data:
-            self._state = data.get("content", "NO DATA")  # Default to "NO DATA" if content is not available
-            self._attributes = {k: v for k, v in data.items() if k != "content"}
+        if data and "id" in data:  # Make sure ID is in the data
+            self._state = data.get("id", "NO DATA")  # Set the state to the SMS ID
+            self._attributes = {k: v for k, v in data.items() if k != "id"}
+            self._attributes["content"] = data.get("content", "NO CONTENT")  # Move content to attributes
             if "date" in self._attributes:
                 self._attributes["formatted_date"] = self.format_date(self._attributes["date"])
-            _LOGGER.info(f"Last SMS sensor updated. Old state: {old_state}, New state: {self._state}")
+            _LOGGER.info(f"Last SMS sensor updated. Old state: {old_state}, New state: {self._state} (SMS ID)")
         else:
             _LOGGER.warning(f"No new SMS data available. Retaining last state: {self._state}")
         self.async_write_ha_state()
@@ -407,6 +412,7 @@ class LastSMSSensor(ZTERouterEntity):
         except ValueError as e:
             _LOGGER.error(f"Error parsing date string {date_str}: {e}")
             return date_str
+
 
 def format_ca_bands(ca_bands, nr5g_action_band):
     if not ca_bands:

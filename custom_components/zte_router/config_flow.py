@@ -40,16 +40,24 @@ class ZTERouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Proceed with creating the entry after validation
             return self.async_create_entry(title=user_input["router_ip"], data=user_input)
 
-        # Base schema for all models
+        # Schema for the configuration form
         base_schema = {
             vol.Required("router_ip"): str,
             vol.Required("router_password"): str,
             vol.Optional("ping_interval", default=100): int,
             vol.Optional("sms_check_interval", default=200): int,
-            vol.Required("monthly_usage_threshold", default=200): int,
+            vol.Required("phone_number", default="13909"): str,  # Existing phone number
+            vol.Required("sms_message", default="BRZINA"): str,  # Existing message
+            vol.Optional("phone_number_1", default=""): str,  # New Phone Number 1
+            vol.Optional("message_1", default=""): str,       # New Message 1
+            vol.Optional("phone_number_2", default=""): str,  # New Phone Number 2
+            vol.Optional("message_2", default=""): str,       # New Message 2
+            vol.Optional("create_automation_sms", default=True): bool,
+            vol.Optional("create_automation_clean", default=False): bool,
+            vol.Optional("create_automation_reboot", default=False): bool
         }
 
-        # Add the router_username field only if model is MC888A or MC889A
+        # Conditionally add the router_username field if applicable
         if self.selected_router_type in ["MC888A", "MC889A"]:
             base_schema[vol.Optional("router_username", default=DEFAULT_USERNAME)] = str
 
@@ -59,6 +67,7 @@ class ZTERouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="config", data_schema=data_schema, errors=errors
         )
+
 
     @staticmethod
     @callback
@@ -83,10 +92,58 @@ class ZTERouterOptionsFlowHandler(config_entries.OptionsFlow):
         current_data = {
             "router_ip": self.config_entry.data.get("router_ip"),
             "router_password": self.config_entry.data.get("router_password"),
-            "router_username": self.config_entry.options.get("router_username", self.config_entry.data.get("router_username", DEFAULT_USERNAME)),
-            "ping_interval": self.config_entry.options.get("ping_interval", self.config_entry.data.get("ping_interval", 100)),
-            "sms_check_interval": self.config_entry.options.get("sms_check_interval", self.config_entry.data.get("sms_check_interval", 200)),
-            "monthly_usage_threshold": self.config_entry.options.get("monthly_usage_threshold", 200),
+            "router_username": self.config_entry.options.get(
+                "router_username",
+                self.config_entry.data.get("router_username", DEFAULT_USERNAME)
+            ),
+            "ping_interval": self.config_entry.options.get(
+                "ping_interval",
+                self.config_entry.data.get("ping_interval", 100)
+            ),
+            "sms_check_interval": self.config_entry.options.get(
+                "sms_check_interval",
+                self.config_entry.data.get("sms_check_interval", 200)
+            ),
+            "monthly_usage_threshold": self.config_entry.options.get(
+                "monthly_usage_threshold",
+                self.config_entry.data.get("monthly_usage_threshold", 200)
+            ),
+            "phone_number": self.config_entry.options.get(
+                "phone_number",
+                self.config_entry.data.get("phone_number", "13909")
+            ),
+            "sms_message": self.config_entry.options.get(
+                "sms_message",
+                self.config_entry.data.get("sms_message", "BRZINA")
+            ),
+            "phone_number_1": self.config_entry.options.get(
+                "phone_number_1",
+                self.config_entry.data.get("phone_number_1", "")
+            ),
+            "message_1": self.config_entry.options.get(
+                "message_1",
+                self.config_entry.data.get("message_1", "")
+            ),
+            "phone_number_2": self.config_entry.options.get(
+                "phone_number_2",
+                self.config_entry.data.get("phone_number_2", "")
+            ),
+            "message_2": self.config_entry.options.get(
+                "message_2",
+                self.config_entry.data.get("message_2", "")
+            ),
+            "create_automation_sms": self.config_entry.options.get(
+                "create_automation_sms",
+                self.config_entry.data.get("create_automation_sms", True)
+            ),
+            "create_automation_clean": self.config_entry.options.get(
+                "create_automation_clean",
+                self.config_entry.data.get("create_automation_clean", False)
+            ),
+            "create_automation_reboot": self.config_entry.options.get(
+                "create_automation_reboot",
+                self.config_entry.data.get("create_automation_reboot", False)
+            ),
         }
 
         # Base options schema without router_type
@@ -96,10 +153,21 @@ class ZTERouterOptionsFlowHandler(config_entries.OptionsFlow):
             vol.Optional("ping_interval", default=current_data["ping_interval"]): int,
             vol.Optional("sms_check_interval", default=current_data["sms_check_interval"]): int,
             vol.Required("monthly_usage_threshold", default=current_data["monthly_usage_threshold"]): int,
+            vol.Required("phone_number", default=current_data["phone_number"]): str,
+            vol.Required("sms_message", default=current_data["sms_message"]): str,
+            vol.Optional("phone_number_1", default=current_data["phone_number_1"]): str,
+            vol.Optional("message_1", default=current_data["message_1"]): str,
+            vol.Optional("phone_number_2", default=current_data["phone_number_2"]): str,
+            vol.Optional("message_2", default=current_data["message_2"]): str,
+            vol.Optional("create_automation_sms", default=current_data["create_automation_sms"]): bool,
+            vol.Optional("create_automation_clean", default=current_data["create_automation_clean"]): bool,
+            vol.Optional("create_automation_reboot", default=current_data["create_automation_reboot"]): bool,
         }
 
-        # Conditionally add the router_username field for specific models
+        # Conditionally add the router_username field if applicable
         if self.config_entry.data.get("router_type") in ["MC888A", "MC889A"]:
             options_schema[vol.Optional("router_username", default=current_data["router_username"])] = str
 
-        return self.async_show_form(step_id="init", data_schema=vol.Schema(options_schema))
+        return self.async_show_form(
+            step_id="init", data_schema=vol.Schema(options_schema)
+        )

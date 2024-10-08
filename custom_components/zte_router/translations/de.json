@@ -2,31 +2,58 @@
     "config": {
         "step": {
             "user": {
-                "title": "Konfiguration ZTE Router",
-                "description": "Bitte gib die erforderlichen Informationen ein, um die ZTE-Router-Integration einzurichten.",
+                "title": "Routermodell auswählen",
+                "description": "Bitte wählen Sie Ihr Routermodell aus.",
                 "data": {
-                    "router_ip": "IP-Adresse des Routers",
+                    "router_type": "Routermodell"
+                }
+            },
+            "config": {
+                "title": "ZTE Router konfigurieren",
+                "description": "Bitte geben Sie die erforderlichen Informationen ein, um die ZTE Router-Integration einzurichten.",
+                "data": {
+                    "router_ip": "Router-IP",
                     "router_password": "Router-Passwort",
-                    "router_username": "Router-Nutzername (in Entwicklung!)",
+                    "router_username": "Router-Benutzername (falls zutreffend)",
                     "ping_interval": "Ping-Intervall (Sekunden)",
-                    "sms_check_interval": "SMS-Check-Interval (Sekunden)"
+                    "sms_check_interval": "SMS-Prüfintervall (Sekunden)",
+                    "monthly_usage_threshold": "Monatliches Nutzungslimit (GB)",
+                    "phone_number": "Telefonnummer",
+                    "sms_message": "SMS-Nachricht",
+                    "phone_number_1": "Telefonnummer 1",
+                    "message_1": "Nachricht 1",
+                    "phone_number_2": "Telefonnummer 2",
+                    "message_2": "Nachricht 2",
+                    "create_automation_sms": "SMS-Automatisierung erstellen",
+                    "create_automation_clean": "Automatisches Löschen des SMS-Speichers erstellen",
+                    "create_automation_reboot": "Neustart-Automatisierung erstellen"
                 }
             }
         },
         "error": {
-            "cannot_connect": "Verbindung zum Router konnte nicht hergestellt werden. Bitte überprüfe die IP-Adresse und versuchenes erneut."
+            "cannot_connect": "Verbindung zum Router fehlgeschlagen. Bitte überprüfen Sie die IP-Adresse und versuchen Sie es erneut."
         }
     },
     "options": {
         "step": {
             "init": {
-                "title": "Konfiguration der ZTE Router Optionen",
+                "title": "ZTE Router Optionen konfigurieren",
                 "data": {
-                    "router_ip": "IP-Adresse des Routers",
+                    "router_ip": "Router-IP",
                     "router_password": "Router-Passwort",
-                    "router_username": "Router-Nutzername (in Entwicklung!)",
+                    "router_username": "Router-Benutzername (falls zutreffend)",
                     "ping_interval": "Ping-Intervall (Sekunden)",
-                    "sms_check_interval": "SMS-Check-Interval (Sekunden)"
+                    "sms_check_interval": "SMS-Prüfintervall (Sekunden)",
+                    "monthly_usage_threshold": "Monatliches Nutzungslimit (GB)",
+                    "phone_number": "Telefonnummer",
+                    "sms_message": "SMS-Nachricht",
+                    "phone_number_1": "Telefonnummer 1",
+                    "message_1": "Nachricht 1",
+                    "phone_number_2": "Telefonnummer 2",
+                    "message_2": "Nachricht 2",
+                    "create_automation_sms": "SMS-Automatisierung erstellen",
+                    "create_automation_clean": "Automatisches Löschen des SMS-Speichers erstellen",
+                    "create_automation_reboot": "Neustart-Automatisierung erstellen"
                 }
             }
         }

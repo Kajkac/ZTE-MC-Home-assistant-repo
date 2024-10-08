@@ -22,6 +22,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     router_type = config.get("router_type", "MC801A")
     username = config.get("router_username") if router_type in ["MC888A", "MC889A"] else None
 
+    phone_number = config.get("phone_number", "13909")
+    sms_message = config.get("sms_message", "BRZINA")
+    create_automation_sms = config.get("create_automation_sms", True)
+    create_automation_clean = config.get("create_automation_clean", False)
+    create_automation_reboot = config.get("create_automation_reboot", False)
+
     # Initialize coordinators with username if applicable
     coordinator = ZTERouterDataUpdateCoordinator(hass, config["router_ip"], config["router_password"], username, ping_interval)
     sms_coordinator = ZTERouterSMSUpdateCoordinator(hass, config["router_ip"], config["router_password"], username, sms_check_interval)
@@ -32,6 +38,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     hass.data[DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,
         "sms_coordinator": sms_coordinator,
+        "phone_number": phone_number,
+        "sms_message": sms_message,
+        "create_automation_sms": create_automation_sms,
+        "create_automation_clean": create_automation_clean,
+        "create_automation_reboot": create_automation_reboot,
     }
 
     # Fetch initial data to get firmware version
@@ -60,7 +71,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     # Find the entity_id for a specific sensor, e.g., "sensor.last_sms"
     sensor_entity_id = None
-
     for entity in entity_registry.entities.values():
         if entity.device_id == device.id and entity.platform == DOMAIN:
             if entity.original_name == "Last SMS":
@@ -70,85 +80,67 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.error("Could not find the necessary entities for automation.")
         return False
 
-    # Define the automation configurations with dynamic device_id and entity_id
-    automations_config = [
-        {
+    # Define the automation configurations based on the user's selections
+    automations_config = []
+    if create_automation_sms:
+        automations_config.append({
             "id": f"{DOMAIN}_automatic_sms_sender_{entry.entry_id}",
-            "alias": f"Automatic SMS Sender T-Mobile HR {ip_address}",
-            "initial_state": None,  # Updated to None
+            "alias": f"Automatic SMS Sender {ip_address}",
             "trigger": [
-                {
-                    "platform": "time_pattern",
-                    "minutes": "/5"
-                }
+                {"platform": "time_pattern", "minutes": "/5"}
             ],
             "condition": [
                 {
-                    "condition": "state",
-                    "entity_id": sensor_entity_id,
-                    "state": "Za nastavak surfanja po maksimalnoj dostupnoj brzini posaljite rijec BRZINA na broj 13909. Vas Hrvatski Telekom"
+                    "condition": "template",
+                    "value_template": "{{ state_attr('sensor.last_sms', 'content') == 'Za nastavak surfanja po maksimalnoj dostupnoj brzini posaljite rijec BRZINA na broj 13909. Vas Hrvatski Telekom' }}"
                 }
             ],
             "action": [
                 {
-                    "service": "button.press",  # Updated service for button entity
+                    "service": "button.press",
                     "target": {
                         "entity_id": "button.send_sms_50gb"
                     }
                 }
             ],
             "mode": "single"
-        },
-        {
+        })
+
+    if create_automation_clean:
+        automations_config.append({
             "id": f"{DOMAIN}_clean_sms_memory_{entry.entry_id}",
             "alias": f"Clean SMS Memory {ip_address}",
-            "initial_state": None,  # Updated to None
             "trigger": [
-                {
-                    "platform": "state",
-                    "entity_id": "sensor.sms_capacity_left",
-                    "to": "5"
-                }
+                {"platform": "state", "entity_id": "sensor.sms_capacity_left", "to": "5"}
             ],
             "condition": [
-                {
-                    "condition": "state",
-                    "entity_id": "sensor.sms_capacity_left",
-                    "state": "5"
-                }
+                {"condition": "state", "entity_id": "sensor.sms_capacity_left", "state": "5"}
             ],
             "action": [
                 {
-                    "service": "button.press",  # Updated service for button entity
-                    "target": {
-                        "entity_id": "button.delete_all_sms"
-                    }
+                    "service": "button.press",
+                    "target": {"entity_id": "button.delete_all_sms"}
                 }
             ],
             "mode": "single"
-        },
-        {
+        })
+
+    if create_automation_reboot:
+        automations_config.append({
             "id": f"{DOMAIN}_zte_reboot_7hrs_{entry.entry_id}",
-            "alias": f"ZTE Reboot 7hrs {ip_address}",
-            "initial_state": None,  # Updated to None
+            "alias": f"ZTE Reboot {ip_address}",
             "trigger": [
-                {
-                    "platform": "time",
-                    "at": "07:00:00"
-                }
+                {"platform": "time", "at": "07:00:00"}
             ],
             "condition": [],
             "action": [
                 {
-                    "service": "button.press",  # Updated service for button entity
-                    "target": {
-                        "entity_id": "button.reboot_router"
-                    }
+                    "service": "button.press",
+                    "target": {"entity_id": "button.reboot_router"}
                 }
             ],
             "mode": "single"
-        }
-    ]
+        })
 
     def automation_exists(alias):
         automations_file = hass.config.path("automations.yaml")
@@ -175,17 +167,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
             for automation_config in automations_config:
                 alias = automation_config["alias"]
-                # Check if automation already exists
                 existing_automation = next((a for a in automations if a.get("alias") == alias), None)
                 if existing_automation:
-                    # Preserve the existing initial_state if the automation already exists
-                    automation_config["initial_state"] = existing_automation.get("initial_state")
+                    initial_state = existing_automation.get("initial_state")
+                    if initial_state is not None:
+                        automation_config["initial_state"] = initial_state
+                    else:
+                        automation_config.pop("initial_state", None)
                 else:
-                    # Do not set initial_state at all if automation is new
-                    # Let Home Assistant handle the default state
                     automation_config.pop("initial_state", None)
 
-                # Remove any existing automation with the same alias
                 automations = [a for a in automations if a.get("alias") != alias]
                 automations.append(automation_config)
 
@@ -205,7 +196,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     if not all(automation_exists_results):
         success = await hass.async_add_executor_job(write_automations)
         if success:
-            # Reload automations
             await hass.services.async_call("automation", "reload")
             _LOGGER.info("Automations created successfully")
         else:

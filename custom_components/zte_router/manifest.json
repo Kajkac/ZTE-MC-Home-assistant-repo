@@ -7,7 +7,7 @@
   "documentation": "https://github.com/Kajkac/ZTE-MC-Home-assistant-repo",
   "integration_type": "hub",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/Vaskivskyi/ZTE-MC-Home-assistant-repo/issues",
+  "issue_tracker": "https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/issues",
   "requirements": ["aiohttp"],
-  "version": "1.0.28"
+  "version": "1.0.29"
 }
