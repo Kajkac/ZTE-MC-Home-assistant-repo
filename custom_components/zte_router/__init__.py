@@ -1,6 +1,7 @@
 import logging
 import yaml
 import os
+from asyncio import Lock
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import async_get as async_get_device_registry
@@ -32,10 +33,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     # Initialize coordinators with username if applicable
     allow_stale_data = config.get(CONF_ALLOW_STALE_DATA, DEFAULT_ALLOW_STALE_DATA)
+    lock = Lock()
     coordinator = ZTERouterDataUpdateCoordinator(
-        hass, config["router_ip"], config["router_password"], username, ping_interval, allow_stale_data
+        hass, config["router_ip"], config["router_password"], username, ping_interval, allow_stale_data, lock=lock
     )
-    sms_coordinator = ZTERouterSMSUpdateCoordinator(hass, config["router_ip"], config["router_password"], username, sms_check_interval)
+    sms_coordinator = ZTERouterSMSUpdateCoordinator(
+        hass, config["router_ip"], config["router_password"], username, sms_check_interval, lock=lock
+    )
 
     await coordinator.async_config_entry_first_refresh()
     await sms_coordinator.async_config_entry_first_refresh()
