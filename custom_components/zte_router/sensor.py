@@ -133,18 +133,26 @@ def extract_json(output):
         return "{}"
 
 class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass, ip, pwd, user, interval, allow_stale_data=True):
+    def __init__(self, hass, ip, pwd, user, interval, allow_stale_data=True, lock=None):
         self.ip_entry = ip
         self.password_entry = pwd
         self.username_entry = user
         self._data = {}
         self.allow_stale_data = allow_stale_data
+        self.lock = lock
         _LOGGER.info(f"Initializing ZTERouterDataUpdateCoordinator with Ping check interval: {interval} seconds")
         super().__init__(
             hass, _LOGGER, name="zte_router", update_interval=timedelta(seconds=interval)
         )
 
     async def _async_update_data(self):
+        if self.lock:
+            async with self.lock:
+                return await self._do_update()
+        else:
+            return await self._do_update()
+
+    async def _do_update(self):
         _LOGGER.info("Starting _async_update_data in ZTERouterDataUpdateCoordinator at %s", datetime.now())
         new_data = {}
         keys = {3: "dynamic_data", 7: "status_data", 16: "client_data"}
@@ -197,11 +205,12 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
                     raise e
 
 class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass, ip, password_entry, username_entry, sms_check_interval):
+    def __init__(self, hass, ip, password_entry, username_entry, sms_check_interval, lock=None):
         self.ip_entry = ip
         self.password_entry = password_entry
         self.username_entry = username_entry if username_entry else ""
         self._data = {}
+        self.lock = lock
         _LOGGER.info(f"Initializing SMSUpdateCoordinator with SMS check interval: {sms_check_interval} seconds")
         super().__init__(
             hass,
@@ -211,6 +220,13 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
         )
 
     async def _async_update_data(self):
+        if self.lock:
+            async with self.lock:
+                return await self._do_sms_update()
+        else:
+            return await self._do_sms_update()
+
+    async def _do_sms_update(self):
         _LOGGER.info("Starting _async_update_data in ZTERouterSMSUpdateCoordinator at %s", datetime.now())
         new_data = {}
         keys = {6: "sms_data"}
