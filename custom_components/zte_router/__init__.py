@@ -8,6 +8,10 @@ from homeassistant.helpers.entity_registry import async_get as async_get_entity_
 from .const import DOMAIN, MANUFACTURER, MODEL,CONF_ALLOW_STALE_DATA, DEFAULT_ALLOW_STALE_DATA
 from .sensor import ZTERouterDataUpdateCoordinator, ZTERouterSMSUpdateCoordinator
 
+# >>> DODANE (START): import rejestratora usługi custom SMS
+from .custom_sms import register_custom_sms_service
+# >>> DODANE (END)
+
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
@@ -81,9 +85,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             if entity.original_name == "Last SMS":
                 sensor_entity_id = entity.entity_id
 
+    # >>> DODANE (START): rejestrujemy usługę custom SMS nawet gdy nie ma sensora i kończymy setup
     if not sensor_entity_id:
         _LOGGER.error("Could not find the necessary entities for automation.")
+        await register_custom_sms_service(hass, entry)
         return False
+    # >>> DODANE (END)
 
     # Define the automation configurations based on the user's selections
     automations_config = []
@@ -204,9 +211,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
             await hass.services.async_call("automation", "reload")
             _LOGGER.info("Automations created successfully")
         else:
+            # >>> DODANE (START): nawet jeśli automatyzacje się nie zapiszą – zarejestruj usługę i wyjdź
+            await register_custom_sms_service(hass, entry)
             return False
+            # >>> DODANE (END)
     else:
         _LOGGER.info("Automations already exist")
+
+    # >>> DODANE (START): rejestracja usługi custom SMS na koniec (ścieżka sukcesu)
+    await register_custom_sms_service(hass, entry)
+    # >>> DODANE (END)
 
     return True
 
