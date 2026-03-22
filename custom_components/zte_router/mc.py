@@ -854,6 +854,33 @@ class zteRouter:
             logger.error(f"Failed to set data mode '{BearerPreference}': {e}")
             return None
 
+    def wifi_switch(self, enable: bool):
+        """Enable or disable all WiFi radios on the router.
+
+        Uses goformId=switchWiFiModule with SwitchOption=1 (on) or 0 (off).
+        This goformId was identified by intercepting the network requests made
+        by the router's own web UI (confirmed on MC888 Ultra firmware
+        CR_VDFEUMC888ULTRAV1.0.0B10).
+        """
+        state = "1" if enable else "0"
+        logger.debug(f"Setting WiFi {'on' if enable else 'off'}")
+        try:
+            AD = getattr(self, "_zte_auth_AD", None)
+            header = {"Referer": self.referer}
+            payload = {
+                'goformId': 'switchWiFiModule',
+                'isTest': 'false',
+                'SwitchOption': state,
+                'AD': AD
+            }
+            encoded_payload = urllib.parse.urlencode(payload)
+            body = encoded_payload.encode('utf-8')
+            r = self.request_with_session('POST', self.referer + "goform/goform_set_cmd_process", headers=header, body=body)
+            logger.info(f"WiFi switch {'on' if enable else 'off'} with status code: {r.status}")
+            return r.status
+        except Exception as e:
+            logger.error(f"Failed to switch WiFi {'on' if enable else 'off'}: {e}")
+            return None
 
 
 # Global variables for SMS sending
@@ -970,6 +997,10 @@ if __name__ == "__main__":
                 results[cmd_id] = zte.setdata_mode("WL_AND_5G")
             elif cmd_id == 16:
                 results[cmd_id] = json.loads(zte.zteinfo4())
+            elif cmd_id == 17:
+                results[cmd_id] = zte.wifi_switch(True)
+            elif cmd_id == 18:
+                results[cmd_id] = zte.wifi_switch(False)
             else:
                 results[cmd_id] = f"Invalid command: {cmd_id}"
         except Exception as e:
