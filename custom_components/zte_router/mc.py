@@ -6,6 +6,8 @@ import json
 import sys
 import os
 import time
+import secrets
+import base64
 import urllib3
 import urllib
 from urllib.parse import quote
@@ -15,6 +17,9 @@ import ssl
 import socket
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 import re
 from pygsm7 import encodeMessage, decodeMessage
 import traceback  # <-- add this at the top if not already
@@ -93,8 +98,17 @@ else:
     # Suppress logging when imported
     logger.setLevel(logging.WARNING)
 
-# Create a PoolManager instance to handle HTTP requests
-s = urllib3.PoolManager(cert_reqs='CERT_NONE')
+# Create a PoolManager instance with permissive TLS settings for router self-signed/weak certs.
+ssl_context = ssl.create_default_context()
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
+try:
+    # Some router certs use weak key params and fail default security level.
+    ssl_context.set_ciphers("DEFAULT:@SECLEVEL=0")
+except Exception:
+    pass
+
+s = urllib3.PoolManager(cert_reqs='CERT_NONE', ssl_context=ssl_context)
 
 def get_sms_time():
     logger.debug("Generating SMS time")
@@ -424,7 +438,9 @@ class zteRouter:
     def sendsms(self, phone_number, message):
         logger.debug(f"Sending SMS to {phone_number} with message: {message}")
         try:
-            AD = getattr(self, "_zte_auth_AD", None)
+            # MC888 firmware expects a fresh AD for protected write actions.
+            AD = self.get_AD() or getattr(self, "_zte_auth_AD", None)
+            self._zte_auth_AD = AD
             header = {"Referer": self.referer}
             # Encode phone number and message
             phoneNumberEncoded = urllib.parse.quote(phone_number, safe="")
@@ -445,7 +461,64 @@ class zteRouter:
             body = encoded_payload.encode('utf-8')
             r = self.request_with_session('POST', self.referer + "goform/goform_set_cmd_process", headers=header, body=body)
             logger.info(f"SMS sent with status code: {r.status}")
-            logger.debug(f"Router response: {r.data.decode(errors='replace')}")
+            response_text = r.data.decode(errors='replace')
+            logger.debug(f"Router response: {response_text}")
+
+            # Newer MC888 firmwares may require RED-encrypted SMS payloads.
+            router_result = None
+            try:
+                parsed = json.loads(response_text)
+                router_result = str(parsed.get("result", "")).lower()
+            except Exception:
+                # Do not short-circuit here; still try RED fallback on non-explicit success.
+                logger.debug("Plain SMS response JSON parse failed; trying RED fallback path")
+
+            if router_result == "success":
+                return r.status
+
+            red_ready = self._setup_red_crypto()
+            if not red_ready:
+                # Some firmwares expose RED SMS crypto only after SMS endpoints are touched.
+                try:
+                    self.ztesmsinfo()
+                except Exception:
+                    pass
+                red_ready = self._setup_red_crypto()
+
+            if red_ready:
+                logger.info("Retrying SMS send with RED encryption payload")
+                AD = self.get_AD() or getattr(self, "_zte_auth_AD", None)
+                self._zte_auth_AD = AD
+                red_payload = {
+                    'isTest': 'false',
+                    'goformId': 'SEND_SMS',
+                    'notCallback': 'true',
+                    'Number': self._red_encrypt_value(phone_number),
+                    'sms_time': get_sms_time(),
+                    'MessageBody': self._red_encrypt_value(encodeMessage(message)),
+                    'ID': '-1',
+                    'encode_type': 'GSM7_default',
+                    'AD': AD
+                }
+                red_body = urllib.parse.urlencode(red_payload).encode('utf-8')
+                rr = self.request_with_session(
+                    'POST',
+                    self.referer + "goform/goform_set_cmd_process",
+                    headers=header,
+                    body=red_body,
+                )
+                logger.info(f"RED SMS send status code: {rr.status}")
+                red_response_text = rr.data.decode(errors='replace')
+                logger.debug(f"RED Router response: {red_response_text}")
+                try:
+                    red_parsed = json.loads(red_response_text)
+                    if red_parsed.get("result") == "success":
+                        return rr.status
+                except Exception:
+                    pass
+            else:
+                logger.info("RED SMS fallback unavailable in this session")
+
             return r.status
         except Exception as e:
             logger.error(f"Failed to send SMS: {e}")
@@ -781,6 +854,9 @@ class zteRouter:
     def parsesms(self):
         logger.debug("Starting SMS parsing process")
         try:
+            # RED-encrypted firmware requires key negotiation before fetching SMS payload.
+            red_ready = self._setup_red_crypto()
+
             header = {"Referer": self.referer}
             payload = {
                 'cmd': 'sms_data_total',
@@ -810,14 +886,60 @@ class zteRouter:
             messages = response_json['messages']
             logger.info(f"Fetched {len(messages)} SMS messages")
             decode_errors = 0
-            for item in messages:
-                try:
-                    original_content = item.get('content', '')
-                    decoded = hex2utf(original_content)
-                    item['content'] = decoded
-                except Exception as e:
-                    logger.warning(f"Failed to decode SMS content: {e}")
-                    decode_errors += 1
+            decrypted_any = False
+
+            def _decode_messages(items):
+                nonlocal decode_errors, decrypted_any
+                for item in items:
+                    try:
+                        original_content = item.get('content', '') or ''
+                        original_number = item.get('number', '') or ''
+
+                        # Legacy mode: UCS2 hex directly from router.
+                        if self._looks_like_hex_ucs2(original_content):
+                            item['content'] = hex2utf(original_content)
+                            decrypted_any = True
+                            continue
+
+                        # Newer firmware mode: RED-encrypted base64 payload.
+                        if red_ready:
+                            decrypted_content = self._red_decrypt_value(original_content)
+                            if decrypted_content and self._looks_like_hex_ucs2(decrypted_content):
+                                item['content'] = hex2utf(decrypted_content)
+                                decrypted_any = True
+                            elif decrypted_content:
+                                item['content'] = decrypted_content
+                                decrypted_any = True
+
+                            decrypted_number = self._red_decrypt_value(original_number)
+                            if decrypted_number:
+                                item['number'] = decrypted_number
+                                decrypted_any = True
+                    except Exception as e:
+                        logger.warning(f"Failed to decode SMS content: {e}")
+                        decode_errors += 1
+
+            _decode_messages(messages)
+
+            # Some RED firmwares require one payload fetch after key setup in same session.
+            if red_ready and messages and not decrypted_any:
+                logger.debug("SMS decrypt yielded no plaintext; refreshing RED session and refetching once")
+                self._red_key_bytes = None
+                red_ready = self._setup_red_crypto()
+                if red_ready:
+                    r = self.request_with_session('GET', url, headers=header)
+                    response_text = r.data.decode('utf-8', errors='replace')
+                    sanitized_text = clean_control_chars(response_text).replace('HR�Telekom', 'HR Telekom')
+                    try:
+                        retry_json = json.loads(sanitized_text)
+                        retry_messages = retry_json.get('messages', [])
+                        if isinstance(retry_messages, list):
+                            messages = retry_messages
+                            response_json['messages'] = messages
+                            _decode_messages(messages)
+                    except Exception as retry_err:
+                        logger.debug(f"SMS retry parse failed: {retry_err}")
+
             if decode_errors:
                 logger.warning(f"{decode_errors} messages failed to decode cleanly.")
             # Return dummy message if no SMS exists
@@ -841,6 +963,123 @@ class zteRouter:
             logger.error(f"Failed to parse SMS: {e}")
             return ""
 
+    def _looks_like_hex_ucs2(self, value):
+        if not value or len(value) % 4 != 0:
+            return False
+        return re.fullmatch(r"[0-9A-Fa-f]+", value) is not None
+
+    def _setup_red_crypto(self):
+        if getattr(self, "_red_key_bytes", None):
+            return True
+        try:
+            def _normalize_pem(pem_text):
+                if not pem_text:
+                    return ""
+                pem_text = pem_text.strip()
+                begin = "-----BEGIN PUBLIC KEY-----"
+                end = "-----END PUBLIC KEY-----"
+                if begin in pem_text and end in pem_text and "\n" not in pem_text:
+                    core = pem_text.replace(begin, "").replace(end, "").strip()
+                    chunks = [core[i:i + 64] for i in range(0, len(core), 64)]
+                    return begin + "\n" + "\n".join(chunks) + "\n" + end + "\n"
+                return pem_text
+
+            AD = getattr(self, "_zte_auth_AD", None)
+            base_urls = [self.referer, f"http://{self.ip}/", f"https://{self.ip}/"]
+            seen = set()
+
+            for base_url in base_urls:
+                if base_url in seen:
+                    continue
+                seen.add(base_url)
+
+                header = {"Referer": base_url}
+                url = base_url + "goform/goform_get_cmd_process?isTest=false&cmd=web_crt_get"
+                r = self.request_with_session('GET', url, headers=header)
+                raw_cert_reply = r.data.decode('utf-8', errors='replace')
+                payload = json.loads(raw_cert_reply)
+                pem = _normalize_pem(payload.get("result", ""))
+                if not pem or "BEGIN PUBLIC KEY" not in pem:
+                    logger.debug(f"RED crypto unavailable on {base_url}: web_crt_get reply={raw_cert_reply}")
+                    continue
+
+                os_hex = secrets.token_hex(32)
+                pubkey = serialization.load_pem_public_key(pem.encode('utf-8'))
+                encrypted = pubkey.encrypt(os_hex.encode('ascii'), asym_padding.PKCS1v15())
+                web_enstr = base64.b64encode(encrypted).decode('ascii')
+
+                payload_variants = [
+                    {
+                        'isTest': 'false',
+                        'goformId': 'web_http_enstr_set',
+                        'web_enstr': web_enstr,
+                        'AD': self.get_AD() or AD
+                    },
+                    {
+                        'isTest': 'false',
+                        'goformId': 'web_http_enstr_set',
+                        'web_enstr': web_enstr,
+                    },
+                ]
+                for idx, payload_set in enumerate(payload_variants, start=1):
+                    body = urllib.parse.urlencode(payload_set).encode('utf-8')
+                    rr = self.request_with_session(
+                        'POST',
+                        base_url + "goform/goform_set_cmd_process",
+                        headers=header,
+                        body=body,
+                    )
+                    reply = rr.data.decode('utf-8', errors='replace')
+                    data = json.loads(reply)
+                    if data.get("result") == "success":
+                        self._red_key_bytes = bytes.fromhex(os_hex)
+                        logger.debug(f"RED crypto session established (base={base_url}, variant={idx})")
+                        return True
+                    logger.debug(f"RED crypto set failed (base={base_url}, variant={idx}): {reply}")
+            return False
+        except Exception as e:
+            logger.debug(f"RED crypto setup failed: {e}")
+            return False
+
+    def _red_encrypt_value(self, plain_text):
+        if not getattr(self, "_red_key_bytes", None):
+            return plain_text
+        if plain_text is None:
+            plain_text = ""
+        iv = secrets.token_bytes(12)
+        encrypted = AESGCM(self._red_key_bytes).encrypt(iv, plain_text.encode('utf-8'), None)
+        cipher = encrypted[:-16]
+        tag = encrypted[-16:]
+        return base64.b64encode(iv + tag + cipher).decode('ascii')
+
+    def _red_decrypt_value(self, encoded_text):
+        if not getattr(self, "_red_key_bytes", None):
+            return None
+        if not encoded_text:
+            return None
+        try:
+            raw = base64.b64decode(encoded_text)
+            if len(raw) < 28:
+                return None
+            iv = raw[:12]
+            # Main observed format: iv(12) + tag(16) + cipher
+            tag = raw[12:28]
+            cipher = raw[28:]
+            plain = AESGCM(self._red_key_bytes).decrypt(iv, cipher + tag, None)
+            return plain.decode('utf-8', errors='replace')
+        except Exception:
+            try:
+                # Compatibility fallback: iv(12) + cipher + tag(16)
+                raw = base64.b64decode(encoded_text)
+                if len(raw) < 28:
+                    return None
+                iv = raw[:12]
+                cipher = raw[12:-16]
+                tag = raw[-16:]
+                plain = AESGCM(self._red_key_bytes).decrypt(iv, cipher + tag, None)
+                return plain.decode('utf-8', errors='replace')
+            except Exception:
+                return None
 
     def connect_data(self):
         logger.debug("Connecting to data network")
