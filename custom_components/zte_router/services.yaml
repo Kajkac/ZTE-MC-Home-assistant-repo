@@ -32,3 +32,36 @@
       required: false
       selector:
         object:
+
+send_custom_sms:
+  name: Send custom SMS
+  description: Send an SMS with an arbitrary phone number and message through a configured router entry, independent of the pre-configured automation phone numbers.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Specific config entry ID when multiple routers are configured.
+      example: 1234567890abcdef1234567890abcdef
+      required: false
+      selector:
+        text:
+    phone_number:
+      name: Phone number
+      description: Destination phone number.
+      example: "0989072702"
+      required: false
+      selector:
+        text:
+    phone:
+      name: Phone (alias)
+      description: Alias for phone_number. Provide either this or phone_number.
+      example: "0989072702"
+      required: false
+      selector:
+        text:
+    message:
+      name: Message
+      description: SMS message text to send.
+      example: "Hello from Home Assistant"
+      required: true
+      selector:
+        text:

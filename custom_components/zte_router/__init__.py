@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 
@@ -21,10 +22,12 @@ from .const import (
     ROUTER_TYPE_G5_ULTRA,
 )
 from .g5_ultra_client import G5UltraRouterRunner
+from .router_backend import run_router_commands
 from .sensor import ZTERouterDataUpdateCoordinator, ZTERouterSMSUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 SERVICE_UBUS_CALL = "ubus_call"
+SERVICE_SEND_CUSTOM_SMS = "send_custom_sms"
 SERVICE_REG_KEY = "__zte_router_service_registered"
 SERVICE_UBUS_CALL_SCHEMA = vol.Schema(
     {
@@ -32,6 +35,14 @@ SERVICE_UBUS_CALL_SCHEMA = vol.Schema(
         vol.Required("module"): cv.string,
         vol.Required("method"): cv.string,
         vol.Optional("params", default={}): dict,
+    }
+)
+SERVICE_SEND_CUSTOM_SMS_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Optional("phone"): cv.string,
+        vol.Optional("phone_number"): cv.string,
+        vol.Required("message"): cv.string,
     }
 )
 
@@ -253,31 +264,35 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry):
     await hass.config_entries.async_reload(entry.entry_id)
 
 
+def _resolve_config_entry(hass: HomeAssistant, entry_id: str | None) -> ConfigEntry:
+    """Resolve the target config entry for a service call, defaulting to the only active one."""
+    active_entries = [
+        eid for eid in hass.data[DOMAIN]
+        if isinstance(hass.data[DOMAIN].get(eid), dict)
+    ]
+    if not entry_id:
+        if len(active_entries) == 1:
+            entry_id = active_entries[0]
+        else:
+            raise HomeAssistantError(
+                "Multiple ZTE Router entries found. Specify entry_id in the service call."
+            )
+    if entry_id not in hass.data[DOMAIN]:
+        raise HomeAssistantError(f"Unknown ZTE Router entry_id: {entry_id}")
+
+    entry = hass.config_entries.async_get_entry(entry_id)
+    if entry is None:
+        raise HomeAssistantError(f"No config entry found for id {entry_id}")
+    return entry
+
+
 def _ensure_services_registered(hass: HomeAssistant) -> None:
     storage = hass.data.setdefault(DOMAIN, {})
     if storage.get(SERVICE_REG_KEY):
         return
 
     async def async_handle_ubus_call(call: ServiceCall):
-        entry_id = call.data.get("entry_id")
-        active_entries = [
-            eid for eid in hass.data[DOMAIN]
-            if isinstance(hass.data[DOMAIN].get(eid), dict)
-        ]
-        if not entry_id:
-            if len(active_entries) == 1:
-                entry_id = active_entries[0]
-            else:
-                raise HomeAssistantError(
-                    "Multiple ZTE Router entries found. Specify entry_id in the service call."
-                )
-        if entry_id not in hass.data[DOMAIN]:
-            raise HomeAssistantError(f"Unknown ZTE Router entry_id: {entry_id}")
-
-        entry = hass.config_entries.async_get_entry(entry_id)
-        if entry is None:
-            raise HomeAssistantError(f"No config entry found for id {entry_id}")
-
+        entry = _resolve_config_entry(hass, call.data.get("entry_id"))
         merged = {**entry.data, **entry.options}
         router_type = merged.get("router_type", ROUTER_TYPE_MC801)
         if router_type != ROUTER_TYPE_G5_ULTRA:
@@ -300,7 +315,7 @@ def _ensure_services_registered(hass: HomeAssistant) -> None:
         hass.bus.async_fire(
             f"{DOMAIN}_ubus_response",
             {
-                "entry_id": entry_id,
+                "entry_id": entry.entry_id,
                 "module": module,
                 "method": method,
                 "params": params,
@@ -309,10 +324,58 @@ def _ensure_services_registered(hass: HomeAssistant) -> None:
             },
         )
 
+    async def async_handle_send_custom_sms(call: ServiceCall):
+        entry = _resolve_config_entry(hass, call.data.get("entry_id"))
+        merged = {**entry.data, **entry.options}
+        router_type = merged.get("router_type", ROUTER_TYPE_MC801)
+        username = merged.get("router_username") if router_type in [ROUTER_TYPE_MC888, ROUTER_TYPE_MC889] else None
+
+        phone = (call.data.get("phone") or call.data.get("phone_number") or "").strip()
+        if not phone:
+            raise HomeAssistantError("send_custom_sms: provide 'phone' or 'phone_number'")
+        message = call.data["message"].strip()
+        if not message:
+            raise HomeAssistantError("send_custom_sms: 'message' cannot be empty")
+
+        try:
+            raw = await hass.async_add_executor_job(
+                run_router_commands,
+                router_type,
+                merged["router_ip"],
+                merged["router_password"],
+                username,
+                "8",
+                phone,
+                message,
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to send SMS: {err}") from err
+
+        try:
+            parsed = json.loads(raw)
+        except Exception as err:
+            raise HomeAssistantError(f"Unexpected response from router: {raw}") from err
+
+        result = parsed.get("8")
+        if result is None:
+            raise HomeAssistantError(f"No result returned for send SMS command: {parsed}")
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to send SMS: {result['error']}")
+        if isinstance(result, int) and not (200 <= result < 300):
+            raise HomeAssistantError(f"Router returned HTTP status {result} while sending SMS")
+
+        _LOGGER.info("send_custom_sms: sent SMS to %s via entry %s", phone, entry.entry_id)
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_UBUS_CALL,
         async_handle_ubus_call,
         schema=SERVICE_UBUS_CALL_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SEND_CUSTOM_SMS,
+        async_handle_send_custom_sms,
+        schema=SERVICE_SEND_CUSTOM_SMS_SCHEMA,
     )
     storage[SERVICE_REG_KEY] = True
