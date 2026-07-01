@@ -1379,6 +1379,14 @@ THROUGHPUT_KEYS = {
     "flux_realtime_rx_thrpt",
 }
 
+# Fields that hold a descriptive string (e.g. "GB") rather than a number.
+# G5 Ultra's ubus backend already resolves these to text; treating them as
+# numeric like the rest of the FLUX fields crashes the float() conversion.
+TEXT_KEYS = {
+    "flux_data_volume_limit_unit",
+    "data_volume_limit_unit",
+}
+
 class ZTEDataStatisticsSensor(ZTERouterEntity):
     def __init__(self, coordinator, key):
         self.coordinator = coordinator
@@ -1403,6 +1411,9 @@ class ZTEDataStatisticsSensor(ZTERouterEntity):
         if raw in [None, "", "null"]:
             _LOGGER.warning(f"[FLUX] {self._name}: Missing or empty value")
             return None if not self.coordinator.allow_stale_data else "N/A"
+
+        if self._key in TEXT_KEYS:
+            return str(raw).strip()
 
         try:
             clean_raw = str(raw).strip()
@@ -1517,8 +1528,8 @@ class ZTEFluxTotalUsageSensor(ZTEFluxSensor):
             tx_raw = self._get_value("flux_monthly_tx_bytes")
             rx_raw = self._get_value("flux_monthly_rx_bytes")
 
-            tx = int(float(tx_raw.strip())) if tx_raw else 0
-            rx = int(float(rx_raw.strip())) if rx_raw else 0
+            tx = int(float(str(tx_raw).strip())) if tx_raw else 0
+            rx = int(float(str(rx_raw).strip())) if rx_raw else 0
 
             total_gb = (tx + rx) / 1024 / 1024 / 1024
             return round(total_gb, 2)
