@@ -488,16 +488,26 @@ class G5UltraRouterRunner:
         LOGGER.debug("Collected %s offline clients", len(records))
         return records
 
+    @staticmethod
+    def _as_dict(value: Any) -> Dict[str, Any]:
+        """Coerce a gather-results entry to a dict.
+
+        _safe_result() falls back to returning the raw ubus envelope (a
+        list) when a call errors out (e.g. "Object not found" on
+        firmware that doesn't expose that module), so callers must not
+        assume dict-shaped results just because the key is present.
+        """
+        return value if isinstance(value, dict) else {}
+
     def build_gather_summary(self, results: Dict[str, Any]) -> Dict[str, Any]:
-        sim_info = results.get("sim_info") or {}
-        router_status = results.get("router_status") or {}
-        wwan = results.get("wwan_iface") or {}
-        sms_settings = results.get("sms_settings") or {}
+        sim_info = self._as_dict(results.get("sim_info"))
+        router_status = self._as_dict(results.get("router_status"))
+        wwan = self._as_dict(results.get("wwan_iface"))
+        sms_settings = self._as_dict(results.get("sms_settings"))
         device_values = extract_device_values(results.get("device_info"))
         common_values = extract_values(results.get("common_config"))
-        signal_info = results.get("signal_info") or {}
-        wifi_global = results.get("wifi_global") or {}
-        wwaniface_config = results.get("wwan_iface") or {}
+        signal_info = self._as_dict(results.get("signal_info"))
+        wifi_global = self._as_dict(results.get("wifi_global"))
 
         summary = {
             "sim_card_number": sim_info.get("msisdn"),
@@ -524,7 +534,7 @@ class G5UltraRouterRunner:
             "sms_center": sms_settings.get("sca"),
             "signal_info": signal_info,
             "wifi_onoff": wifi_global.get("wifi_onoff"),
-            "mobile_data_enable": wwaniface_config.get("enable"),
+            "mobile_data_enable": wwan.get("enable"),
         }
         LOGGER.debug(
             "Summary built: wa_inner_version=%s wan_ip=%s signal_keys=%s",
