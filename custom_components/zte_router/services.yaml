@@ -197,3 +197,224 @@ send_ussd:
       required: true
       selector:
         text:
+
+set_firewall:
+  name: Set firewall (G5 Ultra, beta)
+  description: Enable or disable the router's firewall. G5 Ultra only; not yet field-verified.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    enable:
+      name: Enable
+      required: true
+      selector:
+        boolean:
+
+set_nat:
+  name: Set NAT (G5 Ultra, beta)
+  description: Enable or disable NAT. G5 Ultra only; not yet field-verified.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    enable:
+      name: Enable
+      required: true
+      selector:
+        boolean:
+
+set_upnp:
+  name: Set UPnP (G5 Ultra, beta)
+  description: Enable or disable UPnP. G5 Ultra only; not yet field-verified.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    enable:
+      name: Enable
+      required: true
+      selector:
+        boolean:
+
+set_dmz:
+  name: Set DMZ (G5 Ultra, beta)
+  description: Enable or disable DMZ and set the forwarded host IP. G5 Ultra only; not yet field-verified.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    enable:
+      name: Enable
+      required: true
+      selector:
+        boolean:
+    dmz_ip:
+      name: DMZ host IP
+      description: Required when enabling DMZ.
+      example: "192.168.0.50"
+      required: false
+      selector:
+        text:
+
+set_wan_dns:
+  name: Set WAN DNS (G5 Ultra, beta)
+  description: Configure the WAN DNS servers. G5 Ultra only; not yet field-verified.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    mode:
+      name: Mode
+      required: true
+      selector:
+        select:
+          options:
+            - "auto"
+            - "manual"
+    prefer_dns:
+      name: Primary DNS
+      description: Required when mode is "manual".
+      example: "1.1.1.1"
+      required: false
+      selector:
+        text:
+    standby_dns:
+      name: Secondary DNS
+      description: Required when mode is "manual".
+      example: "8.8.8.8"
+      required: false
+      selector:
+        text:
+
+set_wan_mtu:
+  name: Set WAN MTU (G5 Ultra, beta)
+  description: Set the WAN interface MTU. G5 Ultra only; not yet field-verified.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    mtu:
+      name: MTU
+      example: 1500
+      required: true
+      selector:
+        number:
+          min: 576
+          max: 9000
+
+set_ddns:
+  name: Set DDNS (G5 Ultra, beta)
+  description: Configure Dynamic DNS. G5 Ultra only; not yet field-verified.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    enable:
+      name: Enable
+      required: true
+      selector:
+        boolean:
+    service:
+      name: Service
+      description: Required when enabling DDNS.
+      example: "dyndns"
+      required: false
+      selector:
+        text:
+    domain:
+      name: Domain
+      required: false
+      selector:
+        text:
+    account:
+      name: Account
+      required: false
+      selector:
+        text:
+    password:
+      name: Password
+      required: false
+      selector:
+        text:
+
+set_apn_mode:
+  name: Set APN mode (G5 Ultra, beta)
+  description: Switch the APN between automatic and manual. G5 Ultra only; not yet field-verified.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    mode:
+      name: Mode
+      required: true
+      selector:
+        select:
+          options:
+            - "auto"
+            - "manual"
+
+add_apn_profile:
+  name: Add APN profile (G5 Ultra, beta)
+  description: Add a manual APN profile. G5 Ultra only; not yet field-verified.
+  fields:
+    entry_id:
+      name: Entry ID
+      required: false
+      selector:
+        text:
+    profile_name:
+      name: Profile name
+      required: true
+      selector:
+        text:
+    apn:
+      name: APN
+      example: "internet"
+      required: true
+      selector:
+        text:
+    username:
+      name: Username
+      required: false
+      selector:
+        text:
+    password:
+      name: Password
+      required: false
+      selector:
+        text:
+    pdp_type:
+      name: PDP type
+      required: false
+      selector:
+        select:
+          options:
+            - "ipv4"
+            - "ipv6"
+            - "both"
+    auth_mode:
+      name: Auth mode
+      required: false
+      selector:
+        select:
+          options:
+            - "none"
+            - "pap"
+            - "chap"

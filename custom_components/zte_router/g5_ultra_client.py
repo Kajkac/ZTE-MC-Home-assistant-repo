@@ -866,6 +866,132 @@ class G5UltraRouterRunner:
         )
         return self._safe_result(response)
 
+    def set_firewall(self, enable: bool) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_firewall_switch",
+            {"enable": 1 if enable else 0},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_nat(self, enable: bool) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_nat_switch",
+            {"enable": 1 if enable else 0},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_upnp(self, enable: bool) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_upnp_switch",
+            {"enable_upnp": 1 if enable else 0},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_dmz(self, enable: bool, dmz_ip: str = "") -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_dmz",
+            {"dmz_enable": 1 if enable else 0, "dmz_ip": dmz_ip},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_wan_dns(self, mode: str, prefer_dns: str = "", standby_dns: str = "") -> Dict[str, Any]:
+        """mode: 'auto' or 'manual'."""
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_wan_dns",
+            {
+                "dns_mode": mode,
+                "prefer_dns_manual": prefer_dns,
+                "standby_dns_manual": standby_dns,
+            },
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_wan_mtu(self, mtu: int) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_wan_mtu",
+            {"mtu": mtu},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_ddns(
+        self,
+        enable: bool,
+        service: str = "",
+        domain: str = "",
+        account: str = "",
+        password: str = "",
+    ) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_ddns",
+            {
+                "enable": 1 if enable else 0,
+                "service": service,
+                "domain": domain,
+                # Upstream ubus method itself uses this misspelled key name.
+                "accout": account,
+                "password": password,
+            },
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_apn_mode(self, mode: str) -> Dict[str, Any]:
+        """mode: '0' (auto) or '1' (manual)."""
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_apn_object",
+            "set_apn_mode",
+            {"apn_mode": mode},
+            token,
+        )
+        return self._safe_result(response)
+
+    def add_apn_profile(
+        self,
+        profile_name: str,
+        apn: str,
+        username: str = "",
+        password: str = "",
+        pdp_type: int = 0,
+        auth_mode: int = 0,
+    ) -> Dict[str, Any]:
+        """pdp_type: 0=IPv4, 1=IPv6, 2=both. auth_mode: 0=none, 1=PAP, 2=CHAP."""
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_apn_object",
+            "add_manu_apn",
+            {
+                "profilename": profile_name,
+                "wanapn": apn,
+                "username": username,
+                "password": password,
+                "pdpType": pdp_type,
+                "pppAuthMode": auth_mode,
+            },
+            token,
+        )
+        return self._safe_result(response)
+
     def send_sms(self, number: str, message: str) -> Dict[str, Any]:
         token = self._ensure_token()
         payload = {

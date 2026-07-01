@@ -85,6 +85,81 @@ SERVICE_SEND_USSD_SCHEMA = vol.Schema(
         vol.Required("code"): cv.string,
     }
 )
+SERVICE_SET_FIREWALL = "set_firewall"
+SERVICE_SET_FIREWALL_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("enable"): cv.boolean,
+    }
+)
+SERVICE_SET_NAT = "set_nat"
+SERVICE_SET_NAT_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("enable"): cv.boolean,
+    }
+)
+SERVICE_SET_UPNP = "set_upnp"
+SERVICE_SET_UPNP_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("enable"): cv.boolean,
+    }
+)
+SERVICE_SET_DMZ = "set_dmz"
+SERVICE_SET_DMZ_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("enable"): cv.boolean,
+        vol.Optional("dmz_ip", default=""): cv.string,
+    }
+)
+SERVICE_SET_WAN_DNS = "set_wan_dns"
+SERVICE_SET_WAN_DNS_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("mode"): vol.In(["auto", "manual"]),
+        vol.Optional("prefer_dns", default=""): cv.string,
+        vol.Optional("standby_dns", default=""): cv.string,
+    }
+)
+SERVICE_SET_WAN_MTU = "set_wan_mtu"
+SERVICE_SET_WAN_MTU_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("mtu"): vol.All(vol.Coerce(int), vol.Range(min=576, max=9000)),
+    }
+)
+SERVICE_SET_DDNS = "set_ddns"
+SERVICE_SET_DDNS_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("enable"): cv.boolean,
+        vol.Optional("service", default=""): cv.string,
+        vol.Optional("domain", default=""): cv.string,
+        vol.Optional("account", default=""): cv.string,
+        vol.Optional("password", default=""): cv.string,
+    }
+)
+SERVICE_SET_APN_MODE = "set_apn_mode"
+SERVICE_SET_APN_MODE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("mode"): vol.In(["auto", "manual"]),
+    }
+)
+SERVICE_ADD_APN_PROFILE = "add_apn_profile"
+SERVICE_ADD_APN_PROFILE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("profile_name"): cv.string,
+        vol.Required("apn"): cv.string,
+        vol.Optional("username", default=""): cv.string,
+        vol.Optional("password", default=""): cv.string,
+        vol.Optional("pdp_type", default="ipv4"): vol.In(["ipv4", "ipv6", "both"]),
+        vol.Optional("auth_mode", default="none"): vol.In(["none", "pap", "chap"]),
+    }
+)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up ZTE Router from a config entry."""
@@ -485,6 +560,107 @@ def _ensure_services_registered(hass: HomeAssistant) -> None:
             raise HomeAssistantError(f"Failed to send USSD code: {result['error']}")
         hass.bus.async_fire(f"{DOMAIN}_ussd_response", {"code": call.data["code"], "result": result})
 
+    def _raise_if_error(result, action: str):
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to {action}: {result['error']}")
+
+    async def async_handle_set_firewall(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.set_firewall, call.data["enable"])
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set firewall: {err}") from err
+        _raise_if_error(result, "set firewall")
+
+    async def async_handle_set_nat(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.set_nat, call.data["enable"])
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set NAT: {err}") from err
+        _raise_if_error(result, "set NAT")
+
+    async def async_handle_set_upnp(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.set_upnp, call.data["enable"])
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set UPnP: {err}") from err
+        _raise_if_error(result, "set UPnP")
+
+    async def async_handle_set_dmz(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(
+                runner.set_dmz, call.data["enable"], call.data.get("dmz_ip", "")
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set DMZ: {err}") from err
+        _raise_if_error(result, "set DMZ")
+
+    async def async_handle_set_wan_dns(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(
+                runner.set_wan_dns,
+                call.data["mode"],
+                call.data.get("prefer_dns", ""),
+                call.data.get("standby_dns", ""),
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set WAN DNS: {err}") from err
+        _raise_if_error(result, "set WAN DNS")
+
+    async def async_handle_set_wan_mtu(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.set_wan_mtu, call.data["mtu"])
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set WAN MTU: {err}") from err
+        _raise_if_error(result, "set WAN MTU")
+
+    async def async_handle_set_ddns(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(
+                runner.set_ddns,
+                call.data["enable"],
+                call.data.get("service", ""),
+                call.data.get("domain", ""),
+                call.data.get("account", ""),
+                call.data.get("password", ""),
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set DDNS: {err}") from err
+        _raise_if_error(result, "set DDNS")
+
+    async def async_handle_set_apn_mode(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        mode_code = "1" if call.data["mode"] == "manual" else "0"
+        try:
+            result = await hass.async_add_executor_job(runner.set_apn_mode, mode_code)
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set APN mode: {err}") from err
+        _raise_if_error(result, "set APN mode")
+
+    async def async_handle_add_apn_profile(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        pdp_type_map = {"ipv4": 0, "ipv6": 1, "both": 2}
+        auth_mode_map = {"none": 0, "pap": 1, "chap": 2}
+        try:
+            result = await hass.async_add_executor_job(
+                runner.add_apn_profile,
+                call.data["profile_name"],
+                call.data["apn"],
+                call.data.get("username", ""),
+                call.data.get("password", ""),
+                pdp_type_map[call.data.get("pdp_type", "ipv4")],
+                auth_mode_map[call.data.get("auth_mode", "none")],
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to add APN profile: {err}") from err
+        _raise_if_error(result, "add APN profile")
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_UBUS_CALL,
@@ -526,5 +702,59 @@ def _ensure_services_registered(hass: HomeAssistant) -> None:
         SERVICE_SEND_USSD,
         async_handle_send_ussd,
         schema=SERVICE_SEND_USSD_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_FIREWALL,
+        async_handle_set_firewall,
+        schema=SERVICE_SET_FIREWALL_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_NAT,
+        async_handle_set_nat,
+        schema=SERVICE_SET_NAT_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_UPNP,
+        async_handle_set_upnp,
+        schema=SERVICE_SET_UPNP_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_DMZ,
+        async_handle_set_dmz,
+        schema=SERVICE_SET_DMZ_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_WAN_DNS,
+        async_handle_set_wan_dns,
+        schema=SERVICE_SET_WAN_DNS_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_WAN_MTU,
+        async_handle_set_wan_mtu,
+        schema=SERVICE_SET_WAN_MTU_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_DDNS,
+        async_handle_set_ddns,
+        schema=SERVICE_SET_DDNS_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_APN_MODE,
+        async_handle_set_apn_mode,
+        schema=SERVICE_SET_APN_MODE_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_ADD_APN_PROFILE,
+        async_handle_add_apn_profile,
+        schema=SERVICE_ADD_APN_PROFILE_SCHEMA,
     )
     storage[SERVICE_REG_KEY] = True
