@@ -81,6 +81,34 @@ To install beta versions from HACS:
 
 ![SCreenshot](https://raw.githubusercontent.com/Kajkac/ZTE-MC-Home-assistant-repo/main/zte.png)
 
+## 📡 Services
+
+### `zte_router.send_custom_sms`
+
+Send an SMS with any phone number and message, independent of the phone numbers configured during setup. Useful for calling from your own automations/scripts.
+
+**Fields:**
+- `message` (required) — the text to send.
+- `phone_number` or `phone` (required, provide either one) — destination number.
+- `entry_id` (optional) — only needed if you have more than one ZTE Router entry configured; omit it if you only have one.
+
+Example, in an automation action or a script:
+
+```yaml
+action: zte_router.send_custom_sms
+data:
+  phone_number: "0989072702"
+  message: "Garage door left open for 10 minutes"
+```
+
+Or from Developer Tools → Actions, call `zte_router.send_custom_sms` with the same fields.
+
+This works on all supported router types (MC801, MC888, MC889, G5 Ultra) and reuses the same underlying send-SMS command as the built-in "Send SMS" buttons — it does not affect or replace your configured automations, it's just another way to trigger an SMS with content you choose at call time.
+
+### `zte_router.ubus_call`
+
+Advanced/debug service for G5 Ultra routers only — invokes an arbitrary ubus module/method directly (e.g. for exploring endpoints not yet exposed as sensors). Fields: `module`, `method`, optional `params` (JSON object) and `entry_id`. Not needed for normal use.
+
 ## 🐞 Known Issues
 
 - Some sensors may occasionally show `unknown` until refreshed
