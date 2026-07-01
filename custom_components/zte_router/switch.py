@@ -36,6 +36,9 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         async_add_entities([
             G5UltraWiFiSwitch(main_coordinator, ip_entry, password_entry),
             G5UltraMobileDataSwitch(main_coordinator, ip_entry, password_entry),
+            G5UltraUPnPSwitch(main_coordinator, ip_entry, password_entry),
+            G5UltraDMZSwitch(main_coordinator, ip_entry, password_entry),
+            G5UltraNATSwitch(main_coordinator, ip_entry, password_entry),
         ], False)
     else:
         async_add_entities([
@@ -238,3 +241,195 @@ class G5UltraMobileDataSwitch(CoordinatorEntity, SwitchEntity):
             _LOGGER.info("G5 Ultra mobile data set enable=%s result=%s", enable, result)
         except Exception as err:
             _LOGGER.error("G5 Ultra mobile data toggle failed: %s", err)
+
+
+class G5UltraUPnPSwitch(CoordinatorEntity, SwitchEntity):
+    """UPnP on/off switch for G5 Ultra routers.
+
+    Read via uci.get(config=upnpd) since no vendor 'get' API exists for
+    this. Beta -- confirmed live-readable, but the write side is not yet
+    field-verified.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+
+    @property
+    def name(self):
+        return "UPnP"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_upnp_switch"
+
+    @property
+    def icon(self):
+        return "mdi:upnp"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        return bool(data.get("upnp_enabled"))
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_upnp, True)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_upnp, False)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _set_upnp(self, enable: bool):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.set_upnp(enable)
+            _LOGGER.info("G5 Ultra UPnP set enable=%s result=%s", enable, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra UPnP toggle failed: %s", err)
+
+
+class G5UltraDMZSwitch(CoordinatorEntity, SwitchEntity):
+    """DMZ on/off switch for G5 Ultra routers.
+
+    Read from the firewall UCI config's "DMZ" redirect rule. Turning on
+    without a previously-known target IP will fail cleanly rather than
+    guess an address; use the set_dmz service to (re)configure the
+    target IP, then this switch can toggle it on/off.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+
+    @property
+    def name(self):
+        return "DMZ"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_dmz_switch"
+
+    @property
+    def icon(self):
+        return "mdi:server-security"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        return bool(data.get("dmz_enabled"))
+
+    @property
+    def extra_state_attributes(self):
+        data = self.coordinator.data or {}
+        return {"dmz_ip": data.get("dmz_ip")}
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        dmz_ip = (self.coordinator.data or {}).get("dmz_ip") or ""
+        if not dmz_ip:
+            _LOGGER.error(
+                "G5 Ultra DMZ: no known target IP to re-enable DMZ with; "
+                "use the zte_router.set_dmz service to set one first."
+            )
+            return
+        await self.hass.async_add_executor_job(self._set_dmz, True, dmz_ip)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        dmz_ip = (self.coordinator.data or {}).get("dmz_ip") or ""
+        await self.hass.async_add_executor_job(self._set_dmz, False, dmz_ip)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _set_dmz(self, enable: bool, dmz_ip: str):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.set_dmz(enable, dmz_ip)
+            _LOGGER.info("G5 Ultra DMZ set enable=%s dmz_ip=%s result=%s", enable, dmz_ip, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra DMZ toggle failed: %s", err)
+
+
+class G5UltraNATSwitch(CoordinatorEntity, SwitchEntity):
+    """NAT on/off switch for G5 Ultra routers.
+
+    Experimental: reads the WAN zone's firewall "masq" flag, which is not
+    fully confirmed to be what router_set_nat_switch actually toggles --
+    especially in LTE bridge mode, where masquerading may be structurally
+    disabled regardless of this switch. Treat with caution.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+
+    @property
+    def name(self):
+        return "NAT (experimental)"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_nat_switch"
+
+    @property
+    def icon(self):
+        return "mdi:router-network" if self.is_on else "mdi:router-network-off"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        return bool(data.get("nat_enabled"))
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_nat, True)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_nat, False)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _set_nat(self, enable: bool):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.set_nat(enable)
+            _LOGGER.info("G5 Ultra NAT set enable=%s result=%s", enable, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra NAT toggle failed: %s", err)

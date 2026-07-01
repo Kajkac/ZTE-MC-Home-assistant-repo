@@ -760,3 +760,13 @@ FLUX_ICON_MAP = {
     "flux_total_tx_error_packets": "mdi:alert-octagon",
     "flux_total_rx_error_packets": "mdi:alert-octagon-outline",
 }
+
+# G5 Ultra beta: DDNS is read-only (no way to safely write the password back
+# via a switch), so it's exposed as plain sensors via the generic sensor loop
+# in sensor.py rather than a dedicated switch entity.
+SENSOR_NAMES.update({
+    "ddns_enabled": "DDNS Enabled",
+    "ddns_service": "DDNS Service",
+    "ddns_domain": "DDNS Domain",
+    "ddns_status_text": "DDNS Status",
+})

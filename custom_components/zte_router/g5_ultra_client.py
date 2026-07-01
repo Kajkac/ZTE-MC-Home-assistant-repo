@@ -404,6 +404,18 @@ class G5UltraRouterRunner:
             results["sms_capacity_raw"] = sms_capacity_data
             results["sms_capacity_flat"] = sms_capacity_flat
 
+        for name, getter in (
+            ("upnp_status", self.get_upnp_status),
+            ("dmz_status", self.get_dmz_status),
+            ("nat_status", self.get_nat_status),
+            ("ddns_status", self.get_ddns_status),
+        ):
+            try:
+                results[name] = getter()
+            except Exception as exc:
+                LOGGER.warning("G5 Ultra call %s failed: %s", name, exc)
+                results[name] = {"error": str(exc)}
+
         results["summary"] = self.build_gather_summary(results)
         if sms_capacity_flat:
             results["summary"].update(sms_capacity_flat)
@@ -509,6 +521,10 @@ class G5UltraRouterRunner:
         signal_info = self._as_dict(results.get("signal_info"))
         wifi_global = self._as_dict(results.get("wifi_global"))
         wifi_status = self._as_dict(results.get("wifi_status"))
+        upnp_status = self._as_dict(results.get("upnp_status"))
+        dmz_status = self._as_dict(results.get("dmz_status"))
+        nat_status = self._as_dict(results.get("nat_status"))
+        ddns_status = self._as_dict(results.get("ddns_status"))
 
         summary = {
             "sim_card_number": sim_info.get("msisdn"),
@@ -536,6 +552,14 @@ class G5UltraRouterRunner:
             "signal_info": signal_info,
             "wifi_onoff": wifi_status.get("wifi_onoff", wifi_global.get("wifi_onoff")),
             "mobile_data_enable": wwan.get("enable"),
+            "upnp_enabled": upnp_status.get("enabled"),
+            "dmz_enabled": dmz_status.get("enabled"),
+            "dmz_ip": dmz_status.get("dest_ip"),
+            "nat_enabled": nat_status.get("enabled"),
+            "ddns_enabled": ddns_status.get("enable") == 1 or ddns_status.get("enable") is True,
+            "ddns_service": ddns_status.get("service"),
+            "ddns_domain": ddns_status.get("domain"),
+            "ddns_status_text": ddns_status.get("status"),
         }
         LOGGER.debug(
             "Summary built: wa_inner_version=%s wan_ip=%s signal_keys=%s",
@@ -991,6 +1015,50 @@ class G5UltraRouterRunner:
             token,
         )
         return self._safe_result(response)
+
+    def _get_uci_config(self, config_name: str) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call("uci", "get", {"config": config_name}, token)
+        result = self._safe_result(response)
+        return result if isinstance(result, dict) else {}
+
+    def get_upnp_status(self) -> Dict[str, Any]:
+        """Read UPnP status. No vendor 'get' API exists for this; read from
+        the underlying UCI config instead (uci.get config=upnpd)."""
+        values = self._get_uci_config("upnpd").get("values") or {}
+        config = values.get("config") if isinstance(values, dict) else None
+        config = config if isinstance(config, dict) else {}
+        return {"enabled": config.get("enable_upnp") == "1"}
+
+    def _get_firewall_uci(self) -> Dict[str, Any]:
+        values = self._get_uci_config("firewall").get("values")
+        return values if isinstance(values, dict) else {}
+
+    def get_dmz_status(self) -> Dict[str, Any]:
+        """Read DMZ status. No vendor 'get' API exists; DMZ shows up as a
+        firewall redirect rule named "DMZ" in the UCI firewall config."""
+        for section in self._get_firewall_uci().values():
+            if isinstance(section, dict) and section.get(".type") == "redirect" and section.get("name") == "DMZ":
+                return {"enabled": section.get("enabled") == "1", "dest_ip": section.get("dest_ip", "")}
+        return {"enabled": False, "dest_ip": ""}
+
+    def get_nat_status(self) -> Dict[str, Any]:
+        """Read NAT status via the WAN zone's masquerade flag. No vendor
+        'get' API exists for this. Not fully confirmed to correspond to
+        what router_set_nat_switch actually toggles -- best effort."""
+        for section in self._get_firewall_uci().values():
+            if isinstance(section, dict) and section.get(".type") == "zone" and section.get("name") == "wan":
+                return {"enabled": section.get("masq") == "1"}
+        return {"enabled": False}
+
+    def get_ddns_status(self) -> Dict[str, Any]:
+        """Read DDNS status. Unlike the others, a real vendor 'get' method
+        exists for this (router_get_ddns). Note: it never returns the
+        configured password, so this must stay read-only/informational."""
+        token = self._ensure_token()
+        response = self._ubus_call("zwrt_router.api", "router_get_ddns", {}, token)
+        result = self._safe_result(response)
+        return result if isinstance(result, dict) else {}
 
     def send_sms(self, number: str, message: str) -> Dict[str, Any]:
         token = self._ensure_token()

@@ -87,6 +87,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         ConnectionUptimeSensor(coordinator),
     ])
     handled_keys.update(["station_list", "lan_station_list", "all_devices"])
+    if router_type == ROUTER_TYPE_G5_ULTRA:
+        # These keys already back a dedicated switch entity (switch.py); skip
+        # them here so the generic sensor loop below doesn't create a
+        # redundant duplicate sensor for the same underlying state.
+        handled_keys.update(
+            ["wifi_onoff", "mobile_data_enable", "upnp_enabled", "dmz_enabled", "dmz_ip", "nat_enabled"]
+        )
 
     # Create and store the SMS coordinator (if not already created)
     sms_coordinator = ZTERouterSMSUpdateCoordinator(hass, ip, pwd, user, router_type, sms_check_interval)
