@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   release:
@@ -19,58 +20,60 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Bump version if integration files changed
+    - name: Decide release/bump action
       id: prep
       env:
-        BEFORE_SHA: ${{ github.event.before }}
+        GH_TOKEN: ${{ github.token }}
       run: |
         set -e
         MANIFEST=custom_components/zte_router/manifest.json
         CURRENT=$(jq -r '.version' "$MANIFEST")
-        LAST_MSG=$(git log -1 --pretty=%s)
-        NEW_VERSION="$CURRENT"
 
-        if [[ "$LAST_MSG" == "chore: bump version"* ]]; then
-          echo "Last commit is itself a version bump; nothing to do."
-        elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$BEFORE_SHA" 2>/dev/null && git diff --quiet "$BEFORE_SHA" HEAD -- custom_components/; then
-          echo "No integration files changed in this push; skipping version bump."
-        elif [[ "$CURRENT" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-          MAJOR="${BASH_REMATCH[1]}"
-          MINOR="${BASH_REMATCH[2]}"
-          PATCH="${BASH_REMATCH[3]}"
-          NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
-          jq --arg v "$NEW_VERSION" '.version = $v' "$MANIFEST" > /tmp/manifest.json
-          mv /tmp/manifest.json "$MANIFEST"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "$MANIFEST"
-          git commit -m "chore: bump version to ${NEW_VERSION}"
-          git push
-          echo "Bumped version: ${CURRENT} -> ${NEW_VERSION}"
+        if gh release view "$CURRENT" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+          # This version is already released. If it's a plain MAJOR.MINOR.PATCH,
+          # open a PR bumping the patch number so the next merge gets a release.
+          # Beta/rc versions are left alone -- assume a manual beta cycle.
+          if [[ "$CURRENT" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
+            NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+            BRANCH="chore/bump-${NEW_VERSION}"
+
+            if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+              echo "Branch ${BRANCH} already exists upstream; a bump PR is presumably already open. Nothing to do."
+            else
+              git checkout -b "$BRANCH"
+              jq --arg v "$NEW_VERSION" '.version = $v' "$MANIFEST" > /tmp/manifest.json
+              mv /tmp/manifest.json "$MANIFEST"
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git add "$MANIFEST"
+              git commit -m "chore: bump version to ${NEW_VERSION}"
+              git push origin "$BRANCH"
+              gh pr create \
+                --title "chore: bump version to ${NEW_VERSION}" \
+                --body "Automated version bump: ${CURRENT} is already released, so this bumps the patch version to ${NEW_VERSION} to prepare the next release. Merge to release it." \
+                --base main \
+                --head "$BRANCH"
+              gh pr merge "$BRANCH" --auto --squash || echo "Auto-merge could not be enabled (may need 'Allow auto-merge' turned on in repo settings); merge the bump PR manually."
+            fi
+          else
+            echo "Version ${CURRENT} already released and is not a plain MAJOR.MINOR.PATCH (looks like a manual beta/rc); nothing to auto-bump."
+          fi
+          echo "should_release=false" >> "$GITHUB_OUTPUT"
         else
-          echo "Current version '${CURRENT}' is not a plain MAJOR.MINOR.PATCH (looks like a manual beta/rc); leaving it as-is."
-        fi
-
-        echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
-
-    - name: Check if release already exists
-      id: check_release
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        if gh release view "${{ steps.prep.outputs.version }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-          echo "Release ${{ steps.prep.outputs.version }} already exists; skipping."
-          echo "exists=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "exists=false" >> "$GITHUB_OUTPUT"
+          echo "Version ${CURRENT} has no release yet; will create it."
+          echo "version=${CURRENT}" >> "$GITHUB_OUTPUT"
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
         fi
 
     - name: Zip integration files
-      if: steps.check_release.outputs.exists == 'false'
+      if: steps.prep.outputs.should_release == 'true'
       run: zip -r zte_router.zip custom_components/zte_router
 
     - name: Get last commit message
-      if: steps.check_release.outputs.exists == 'false'
+      if: steps.prep.outputs.should_release == 'true'
       id: last_commit
       run: |
         {
@@ -81,7 +84,7 @@ jobs:
         } >> "$GITHUB_OUTPUT"
 
     - name: Create Release
-      if: steps.check_release.outputs.exists == 'false'
+      if: steps.prep.outputs.should_release == 'true'
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.prep.outputs.version }}
