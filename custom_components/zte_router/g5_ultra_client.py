@@ -508,6 +508,7 @@ class G5UltraRouterRunner:
         common_values = extract_values(results.get("common_config"))
         signal_info = self._as_dict(results.get("signal_info"))
         wifi_global = self._as_dict(results.get("wifi_global"))
+        wifi_status = self._as_dict(results.get("wifi_status"))
 
         summary = {
             "sim_card_number": sim_info.get("msisdn"),
@@ -533,7 +534,7 @@ class G5UltraRouterRunner:
             "device_alias_name": common_values.get("device_alias_name"),
             "sms_center": sms_settings.get("sca"),
             "signal_info": signal_info,
-            "wifi_onoff": wifi_global.get("wifi_onoff"),
+            "wifi_onoff": wifi_status.get("wifi_onoff", wifi_global.get("wifi_onoff")),
             "mobile_data_enable": wwan.get("enable"),
         }
         LOGGER.debug(
