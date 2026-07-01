@@ -364,7 +364,8 @@ def _ensure_services_registered(hass: HomeAssistant) -> None:
         if isinstance(result, int) and not (200 <= result < 300):
             raise HomeAssistantError(f"Router returned HTTP status {result} while sending SMS")
 
-        _LOGGER.info("send_custom_sms: sent SMS to %s via entry %s", phone, entry.entry_id)
+        masked_phone = f"{'*' * max(len(phone) - 2, 0)}{phone[-2:] if len(phone) >= 2 else phone}"
+        _LOGGER.info("send_custom_sms: sent SMS to %s via entry %s", masked_phone, entry.entry_id)
 
     hass.services.async_register(
         DOMAIN,
