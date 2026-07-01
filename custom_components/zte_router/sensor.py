@@ -324,6 +324,18 @@ class ZTERouterEntity(RestoreEntity, Entity):
         # Only return attributes if self._attributes is defined
         return getattr(self, "_attributes", {})
 
+# Long delimited-list fields: (separator, unit label for the summarized state).
+# The full value is preserved in the "raw_value" attribute.
+LIST_SUMMARY_KEYS = {
+    "lte_band": (",", "bands"),
+    "nr5g_nsa_band_lock": (",", "bands"),
+    "nr5g_sa_band_lock": (",", "bands"),
+    "lteca": (";", "carriers"),
+    "ltecasig": (";", "readings"),
+    "nr_neighbor_cell": (";", "neighbors"),
+    "lte_neighbor_cell": (";", "neighbors"),
+}
+
 class ZTERouterSensor(ZTERouterEntity):
     def __init__(self, coordinator, name, key, disabled_by_default=False):
         self.coordinator = coordinator
@@ -414,6 +426,17 @@ class ZTERouterSensor(ZTERouterEntity):
                         _LOGGER.debug(
                             f"Truncated 'ngbr_cell_info' to {max_length} characters for key '{self._key}'."
                         )
+
+                elif self._key in LIST_SUMMARY_KEYS and new_state.strip():
+                    # Long delimited lists (band masks, carrier-aggregation legs,
+                    # neighbor cells) look ugly as a raw state string on the
+                    # device page. Show a short count instead; the full value
+                    # is still available as the "raw_value" attribute.
+                    separator, unit = LIST_SUMMARY_KEYS[self._key]
+                    items = [item for item in new_state.split(separator) if item.strip()]
+                    raw_state = f"{len(items)} {unit}"
+                    display_state = raw_state
+                    self._attributes = {"raw_value": new_state}
 
                 # Compare raw values to detect change
                 if raw_state != old_state:
