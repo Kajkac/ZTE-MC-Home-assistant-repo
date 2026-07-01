@@ -3,58 +3,62 @@ name: Create Release
 on:
   push:
     branches:
-      - '*'
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3  # Updated to v3
+      uses: actions/checkout@v4
 
     - name: Read current version from manifest.json
       id: read_version
       run: |
         VERSION=$(jq -r '.version' custom_components/zte_router/manifest.json)
-        echo "VERSION=${VERSION}" >> $GITHUB_ENV
+        echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
         echo "Current version: ${VERSION}"
 
-    - name: Display current version
-      run: echo "VERSION=${{ env.VERSION }}"
+    - name: Check if release already exists
+      id: check_release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        if gh release view "${{ steps.read_version.outputs.version }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+          echo "Release ${{ steps.read_version.outputs.version }} already exists; skipping."
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+        fi
 
-    - name: Zip files
+    - name: Zip integration files
+      if: steps.check_release.outputs.exists == 'false'
       run: zip -r zte_router.zip custom_components/zte_router
 
     - name: Get last commit message
+      if: steps.check_release.outputs.exists == 'false'
       id: last_commit
       run: |
-        LAST_COMMIT_MESSAGE=$(git log -1 --pretty=format:'%s')
-        echo "LAST_COMMIT_MESSAGE=${LAST_COMMIT_MESSAGE}" >> $GITHUB_ENV
-        echo "Last commit message: ${LAST_COMMIT_MESSAGE}"
+        {
+          echo "message<<EOF"
+          git log -1 --pretty=format:'%s'
+          echo
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.PAT }}
+      if: steps.check_release.outputs.exists == 'false'
+      uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ env.VERSION }}  # ← No 'v' prefix here
-        release_name: ZTE_MC_HA_CI_v${{ env.VERSION }}
+        tag_name: ${{ steps.read_version.outputs.version }}
+        name: ZTE_MC_HA_CI_v${{ steps.read_version.outputs.version }}
         body: |
           Changes in this release:
-          - ${{ env.LAST_COMMIT_MESSAGE }}
-        prerelease: ${{ contains(env.VERSION, 'b') || contains(env.VERSION, 'beta') || contains(env.VERSION, 'rc') || contains(env.VERSION, 'alpha') }}
-      
-      
-
-    - name: Upload Release Asset
-      id: upload-release-asset
-      uses: actions/upload-release-asset@v1  # v1 uses Node16/Node20 automatically
-      env:
-        GITHUB_TOKEN: ${{ secrets.PAT }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./zte_router.zip
-        asset_name: zte_router.zip
-        asset_content_type: application/zip
+          - ${{ steps.last_commit.outputs.message }}
+        prerelease: ${{ contains(steps.read_version.outputs.version, 'b') || contains(steps.read_version.outputs.version, 'beta') || contains(steps.read_version.outputs.version, 'rc') || contains(steps.read_version.outputs.version, 'alpha') }}
+        files: zte_router.zip
