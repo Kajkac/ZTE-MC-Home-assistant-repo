@@ -176,11 +176,14 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
                 for cmd, label in keys.items():
                     cmd_str = str(cmd)
                     cmd_data = parsed.get(cmd_str, {})
-                    if isinstance(cmd_data, dict):
+                    if isinstance(cmd_data, dict) and "error" not in cmd_data:
                         new_data[label] = cmd_data
                         new_data.update(cmd_data)
                     else:
-                        _LOGGER.warning(f"Unexpected cmd_data format for command {cmd}: {cmd_data}")
+                        _LOGGER.warning(
+                            f"[ZTE] Command {cmd} ({label}) failed or returned no data this cycle, "
+                            f"keeping previous values for its fields: {cmd_data}"
+                        )
             else:
                 _LOGGER.warning("[ZTE] Empty overall response, no data parsed.")
         except Exception as e:
@@ -192,7 +195,10 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
         if not new_data and not self.allow_stale_data:
             raise UpdateFailed("[ZTE] No valid data obtained from router.")
 
-        self._data = new_data or self._data  # Retain old data if new data is empty
+        # Merge onto the existing data instead of replacing it wholesale, so a single
+        # sub-command failing on one poll (e.g. a transient ubus error) doesn't wipe
+        # out unrelated, still-valid fields from the last successful poll.
+        self._data = {**self._data, **new_data} if new_data else self._data
         return self._data
 
 
