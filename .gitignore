@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.log
+*.log.*
+.DS_Store
+node_modules/
+package-lock.json
+*.zip
