@@ -45,6 +45,46 @@ SERVICE_SEND_CUSTOM_SMS_SCHEMA = vol.Schema(
         vol.Required("message"): cv.string,
     }
 )
+SERVICE_SET_NETWORK_MODE = "set_network_mode"
+SERVICE_SET_NETWORK_MODE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("mode"): vol.In(["ONLY_3G", "ONLY_4G", "ONLY_5G", "4G_AND_5G"]),
+    }
+)
+SERVICE_LOCK_CELL = "lock_cell"
+SERVICE_LOCK_CELL_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("technology"): vol.In(["4g", "5g"]),
+        vol.Required("pci"): cv.string,
+        vol.Required("earfcn"): cv.string,
+        vol.Optional("band"): cv.string,
+    }
+)
+SERVICE_SET_BAND_LOCK = "set_band_lock"
+SERVICE_SET_BAND_LOCK_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("technology"): vol.In(["4g", "5g"]),
+        vol.Optional("band_mask"): cv.string,
+        vol.Optional("nr_type"): vol.In(["nsa", "sa"]),
+        vol.Optional("bands"): cv.string,
+    }
+)
+SERVICE_RESET_BAND_CELL_LOCKS = "reset_band_cell_locks"
+SERVICE_RESET_BAND_CELL_LOCKS_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+    }
+)
+SERVICE_SEND_USSD = "send_ussd"
+SERVICE_SEND_USSD_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("code"): cv.string,
+    }
+)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up ZTE Router from a config entry."""
@@ -366,6 +406,85 @@ def _ensure_services_registered(hass: HomeAssistant) -> None:
 
         _LOGGER.info("send_custom_sms: sent SMS via entry %s", entry.entry_id)
 
+    def _resolve_g5_ultra_runner(call: ServiceCall) -> G5UltraRouterRunner:
+        entry = _resolve_config_entry(hass, call.data.get("entry_id"))
+        merged = {**entry.data, **entry.options}
+        if merged.get("router_type") != ROUTER_TYPE_G5_ULTRA:
+            raise HomeAssistantError("This service is only available for G5 Ultra router entries.")
+        return G5UltraRouterRunner(merged["router_ip"], merged["router_password"])
+
+    async def async_handle_set_network_mode(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.set_network_mode, call.data["mode"])
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set network mode: {err}") from err
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to set network mode: {result['error']}")
+
+    async def async_handle_lock_cell(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        technology = call.data["technology"]
+        try:
+            if technology == "4g":
+                result = await hass.async_add_executor_job(
+                    runner.lock_lte_cell, call.data["pci"], call.data["earfcn"]
+                )
+            else:
+                band = call.data.get("band")
+                if not band:
+                    raise HomeAssistantError("lock_cell: 'band' is required for technology '5g'")
+                result = await hass.async_add_executor_job(
+                    runner.lock_nr_cell, call.data["pci"], call.data["earfcn"], band
+                )
+        except HomeAssistantError:
+            raise
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to lock cell: {err}") from err
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to lock cell: {result['error']}")
+
+    async def async_handle_set_band_lock(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        technology = call.data["technology"]
+        try:
+            if technology == "4g":
+                band_mask = call.data.get("band_mask")
+                if not band_mask:
+                    raise HomeAssistantError("set_band_lock: 'band_mask' is required for technology '4g'")
+                result = await hass.async_add_executor_job(runner.set_lte_band_lock, band_mask)
+            else:
+                nr_type = call.data.get("nr_type")
+                bands = call.data.get("bands")
+                if not nr_type or not bands:
+                    raise HomeAssistantError("set_band_lock: 'nr_type' and 'bands' are required for technology '5g'")
+                result = await hass.async_add_executor_job(runner.set_nr_band_lock, nr_type, bands)
+        except HomeAssistantError:
+            raise
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set band lock: {err}") from err
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to set band lock: {result['error']}")
+
+    async def async_handle_reset_band_cell_locks(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.reset_band_cell_locks)
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to reset band/cell locks: {err}") from err
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to reset band/cell locks: {result['error']}")
+
+    async def async_handle_send_ussd(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.send_ussd, call.data["code"])
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to send USSD code: {err}") from err
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to send USSD code: {result['error']}")
+        hass.bus.async_fire(f"{DOMAIN}_ussd_response", {"code": call.data["code"], "result": result})
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_UBUS_CALL,
@@ -377,5 +496,35 @@ def _ensure_services_registered(hass: HomeAssistant) -> None:
         SERVICE_SEND_CUSTOM_SMS,
         async_handle_send_custom_sms,
         schema=SERVICE_SEND_CUSTOM_SMS_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_NETWORK_MODE,
+        async_handle_set_network_mode,
+        schema=SERVICE_SET_NETWORK_MODE_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOCK_CELL,
+        async_handle_lock_cell,
+        schema=SERVICE_LOCK_CELL_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_BAND_LOCK,
+        async_handle_set_band_lock,
+        schema=SERVICE_SET_BAND_LOCK_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_RESET_BAND_CELL_LOCKS,
+        async_handle_reset_band_cell_locks,
+        schema=SERVICE_RESET_BAND_CELL_LOCKS_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SEND_USSD,
+        async_handle_send_ussd,
+        schema=SERVICE_SEND_USSD_SCHEMA,
     )
     storage[SERVICE_REG_KEY] = True

@@ -11,6 +11,7 @@ from .const import (
     ROUTER_TYPE_MC888,
     ROUTER_TYPE_MC889,
 )
+from .g5_ultra_client import G5UltraRouterRunner
 from .router_backend import run_router_commands
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,9 +32,12 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         else None
     )
 
-    # WiFi switch is only supported on MC-series routers.
-    # G5 Ultra uses a different (ubus) API; its WiFi toggle is not yet implemented.
-    if router_type != ROUTER_TYPE_G5_ULTRA:
+    if router_type == ROUTER_TYPE_G5_ULTRA:
+        async_add_entities([
+            G5UltraWiFiSwitch(main_coordinator, ip_entry, password_entry),
+            G5UltraMobileDataSwitch(main_coordinator, ip_entry, password_entry),
+        ], False)
+    else:
         async_add_entities([
             WiFiSwitch(main_coordinator, ip_entry, password_entry, username_entry, router_type)
         ], False)
@@ -116,3 +120,121 @@ class WiFiSwitch(CoordinatorEntity, SwitchEntity):
             _LOGGER.info("WiFi toggle command %s output: %s", command, result)
         except Exception as err:
             _LOGGER.error("WiFi toggle command %s failed: %s", command, err)
+
+
+class G5UltraWiFiSwitch(CoordinatorEntity, SwitchEntity):
+    """WiFi on/off switch for G5 Ultra routers.
+
+    Uses ubus zwrt_wlan.set (zte_mbb.wifi_onoff). Not yet field-verified --
+    beta feature, discovered via reverse-engineering research on related
+    G5-family hardware.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+
+    @property
+    def name(self):
+        return "Router WiFi"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_wifi_switch"
+
+    @property
+    def icon(self):
+        return "mdi:wifi" if self.is_on else "mdi:wifi-off"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        return str(data.get("wifi_onoff", "0")) == "1"
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_wifi, True)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_wifi, False)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _set_wifi(self, enable: bool):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.set_wifi(enable)
+            _LOGGER.info("G5 Ultra WiFi set enable=%s result=%s", enable, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra WiFi toggle failed: %s", err)
+
+
+class G5UltraMobileDataSwitch(CoordinatorEntity, SwitchEntity):
+    """Mobile data (WWAN) on/off switch for G5 Ultra routers.
+
+    Uses ubus zwrt_data.set_wwaniface. Not yet field-verified -- beta
+    feature, discovered via reverse-engineering research on related
+    G5-family hardware.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+
+    @property
+    def name(self):
+        return "Mobile Data"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_mobile_data_switch"
+
+    @property
+    def icon(self):
+        return "mdi:signal-cellular-3" if self.is_on else "mdi:signal-cellular-outline"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        return str(data.get("mobile_data_enable", "0")) == "1"
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_mobile_data, True)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_mobile_data, False)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _set_mobile_data(self, enable: bool):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.set_mobile_data(enable)
+            _LOGGER.info("G5 Ultra mobile data set enable=%s result=%s", enable, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra mobile data toggle failed: %s", err)

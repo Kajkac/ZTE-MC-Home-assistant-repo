@@ -496,6 +496,8 @@ class G5UltraRouterRunner:
         device_values = extract_device_values(results.get("device_info"))
         common_values = extract_values(results.get("common_config"))
         signal_info = results.get("signal_info") or {}
+        wifi_global = results.get("wifi_global") or {}
+        wwaniface_config = results.get("wwan_iface") or {}
 
         summary = {
             "sim_card_number": sim_info.get("msisdn"),
@@ -521,6 +523,8 @@ class G5UltraRouterRunner:
             "device_alias_name": common_values.get("device_alias_name"),
             "sms_center": sms_settings.get("sca"),
             "signal_info": signal_info,
+            "wifi_onoff": wifi_global.get("wifi_onoff"),
+            "mobile_data_enable": wwaniface_config.get("enable"),
         }
         LOGGER.debug(
             "Summary built: wa_inner_version=%s wan_ip=%s signal_keys=%s",
@@ -751,6 +755,102 @@ class G5UltraRouterRunner:
             "zwrt_mc.device.manager",
             "device_reboot",
             {"moduleName": "web"},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_mobile_data(self, enable: bool) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_data",
+            "set_wwaniface",
+            {"source_module": "web", "cid": 1, "enable": 1 if enable else 0},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_wifi(self, enable: bool) -> Dict[str, Any]:
+        token = self._ensure_token()
+        params = {"zte_mbb": {"wifi_onoff": "1" if enable else "0"}}
+        if enable:
+            params["zte_mbb"]["lbd"] = "1"
+            params["zte_mbb"]["mlo"] = "0"
+        response = self._ubus_call("zwrt_wlan", "set", params, token)
+        return self._safe_result(response)
+
+    def set_network_mode(self, mode: str) -> Dict[str, Any]:
+        """mode: one of ONLY_3G, ONLY_4G, ONLY_5G, 4G_AND_5G."""
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zte_nwinfo_api",
+            "nwinfo_set_netselect",
+            {"net_select": mode},
+            token,
+        )
+        return self._safe_result(response)
+
+    def lock_lte_cell(self, pci: str, earfcn: str) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zte_nwinfo_api",
+            "nwinfo_lock_lte_cell",
+            {"lock_lte_pci": pci, "lock_lte_earfcn": earfcn},
+            token,
+        )
+        return self._safe_result(response)
+
+    def lock_nr_cell(self, pci: str, arfcn: str, band: str) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zte_nwinfo_api",
+            "nwinfo_lock_nr_cell",
+            {"lock_nr_pci": pci, "lock_nr_earfcn": arfcn, "lock_nr_cell_band": band},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_lte_band_lock(self, band_mask: str) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zte_nwinfo_api",
+            "nwinfo_set_gwl_bandlock",
+            {
+                "is_lte_band": "1",
+                "lte_band_mask": band_mask,
+                "is_gw_band": "0",
+                "gw_band_mask": "0",
+            },
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_nr_band_lock(self, nr_type: str, bands: str) -> Dict[str, Any]:
+        """nr_type: 'nsa' or 'sa'. bands: comma-separated band numbers, e.g. '78,3,1'."""
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zte_nwinfo_api",
+            "nwinfo_set_nrbandlock",
+            {"nr5g_type": nr_type, "nr5g_band": bands},
+            token,
+        )
+        return self._safe_result(response)
+
+    def reset_band_cell_locks(self) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zte_nwinfo_api",
+            "nwinfo_reset_band_cell_setting",
+            {},
+            token,
+        )
+        return self._safe_result(response)
+
+    def send_ussd(self, code: str) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_ussd",
+            "libzte_ussd_web_process",
+            {"ussd_data": code},
             token,
         )
         return self._safe_result(response)

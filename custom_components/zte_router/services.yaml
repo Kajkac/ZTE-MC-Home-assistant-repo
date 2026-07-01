@@ -65,3 +65,135 @@ send_custom_sms:
       required: true
       selector:
         text:
+
+set_network_mode:
+  name: Set network mode (G5 Ultra, beta)
+  description: Restrict the modem to a specific radio access technology. G5 Ultra only; not yet field-verified on all firmware.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Specific config entry ID when multiple routers are configured.
+      required: false
+      selector:
+        text:
+    mode:
+      name: Mode
+      description: Network mode to select.
+      required: true
+      selector:
+        select:
+          options:
+            - "ONLY_3G"
+            - "ONLY_4G"
+            - "ONLY_5G"
+            - "4G_AND_5G"
+
+lock_cell:
+  name: Lock cell (G5 Ultra, beta)
+  description: Lock the modem to a specific 4G or 5G cell by PCI/EARFCN. G5 Ultra only; not yet field-verified on all firmware.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Specific config entry ID when multiple routers are configured.
+      required: false
+      selector:
+        text:
+    technology:
+      name: Technology
+      description: Which radio to lock.
+      required: true
+      selector:
+        select:
+          options:
+            - "4g"
+            - "5g"
+    pci:
+      name: PCI
+      description: Physical Cell ID to lock to.
+      required: true
+      selector:
+        text:
+    earfcn:
+      name: EARFCN / NR-ARFCN
+      description: EARFCN (4g) or NR-ARFCN (5g) of the target cell.
+      required: true
+      selector:
+        text:
+    band:
+      name: Band
+      description: Required for technology "5g" only.
+      required: false
+      selector:
+        text:
+
+set_band_lock:
+  name: Set band lock (G5 Ultra, beta)
+  description: Restrict the modem to specific LTE or NR bands. G5 Ultra only; not yet field-verified on all firmware.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Specific config entry ID when multiple routers are configured.
+      required: false
+      selector:
+        text:
+    technology:
+      name: Technology
+      description: Which radio's band lock to set.
+      required: true
+      selector:
+        select:
+          options:
+            - "4g"
+            - "5g"
+    band_mask:
+      name: LTE band mask
+      description: Required for technology "4g". Hex bitmask of allowed LTE bands.
+      example: "0x87e28a0e00d7"
+      required: false
+      selector:
+        text:
+    nr_type:
+      name: NR type
+      description: Required for technology "5g".
+      required: false
+      selector:
+        select:
+          options:
+            - "nsa"
+            - "sa"
+    bands:
+      name: NR bands
+      description: Required for technology "5g". Comma-separated NR band numbers.
+      example: "78,3,1"
+      required: false
+      selector:
+        text:
+
+reset_band_cell_locks:
+  name: Reset band/cell locks (G5 Ultra, beta)
+  description: Clear any active band and cell locks, returning to automatic selection. G5 Ultra only.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Specific config entry ID when multiple routers are configured.
+      required: false
+      selector:
+        text:
+
+send_ussd:
+  name: Send USSD code (G5 Ultra, beta)
+  description: Send a USSD code (e.g. balance check) to the mobile network. G5 Ultra only; not yet field-verified on all firmware.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Specific config entry ID when multiple routers are configured.
+      required: false
+      selector:
+        text:
+    code:
+      name: USSD code
+      description: The USSD code to send.
+      example: "*100#"
+      required: true
+      selector:
+        text:
