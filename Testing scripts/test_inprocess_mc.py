@@ -70,17 +70,19 @@ import mc  # noqa: E402  (must come after sys.path setup above)
 STRICT_COMPARE_COMMANDS = [1, 2, 3, 7, 16]  # zteinfo, zteinfo2, ztesmsinfo, zteinfo3, zteinfo4
 INFO_ONLY_COMMANDS = [6]  # last SMS -- formatting of the "no SMS" dummy differs slightly, shown but not diffed
 
-# Fields that are expected to change between two sequential calls a second or
-# two apart -- live signal readings, running byte/time counters, connection
-# durations -- because the router's real state moves between the subprocess
-# call and the in-process call, not because the two approaches disagree.
-NOISY_KEYS = {
-    "realtime_tx_bytes", "realtime_rx_bytes", "realtime_time",
-    "realtime_tx_thrpt", "realtime_rx_thrpt", "monthly_time",
-    "connect_time", "rssi", "lte_rssi", "rscp", "lte_rsrp", "lte_rsrq",
-    "lte_snr", "Z5g_snr", "Z5g_rsrp", "Z5g_rsrq", "Z5g_SINR", "ecio",
-    "signalbar",
-}
+# Substrings of field names that are expected to change between two
+# sequential calls a second or two apart -- live signal readings (including
+# per-antenna variants like lte_snr_4 or 5g_rx1_rsrp), running byte/time
+# counters, connection durations, and fields the router itself re-encrypts
+# with a fresh random IV on every single request (imsi, sim_imsi, the WiFi
+# password_encode fields, per-cell CA signal info) -- because the router's
+# real state (or its own crypto nonce) moves between the subprocess call and
+# the in-process call, not because the two approaches disagree.
+NOISY_SUBSTRINGS = [
+    "realtime_", "connect_time", "monthly_time", "monthly_tx_bytes",
+    "monthly_rx_bytes", "rsrp", "rsrq", "rssi", "rscp", "snr", "sinr",
+    "ecio", "signalbar", "scell_sig_info", "password_encode", "imsi",
+]
 
 
 def diff_values(path, a, b, out):
@@ -99,6 +101,11 @@ def diff_values(path, a, b, out):
 
 def _leaf_key(path):
     return path.rsplit(".", 1)[-1].split("[")[0]
+
+
+def _is_noisy(path):
+    key = _leaf_key(path).lower()
+    return any(sub in key for sub in NOISY_SUBSTRINGS)
 
 
 def run_via_subprocess(ip, password, username, commands):
@@ -173,7 +180,7 @@ def test_single_router(ip, password, username, label):
             real_mismatches.append((cmd_id, sub_val, proc_val))
             continue
         for path, a, b in leaves:
-            if _leaf_key(path) in NOISY_KEYS:
+            if _is_noisy(path):
                 noisy_diffs.append((cmd_id, path, a, b))
             else:
                 real_mismatches.append((cmd_id, path or "(whole value)", a, b))
