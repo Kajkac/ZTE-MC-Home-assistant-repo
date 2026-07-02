@@ -112,7 +112,13 @@ SUMMARY_MAP = {
 
 
 def sha256_hex(value: str) -> str:
-    return hashlib.sha256(value.encode("utf-8")).hexdigest().upper()
+    # Not a password-storage hash -- this replicates the G5 Ultra router's own
+    # firmware-mandated login challenge-response (SHA256(SHA256(password) + salt)),
+    # which the router computes independently and compares against. The
+    # algorithm is fixed by the router, not a security choice made here;
+    # switching to a slow/salted KDF would produce a different value than the
+    # router expects and break login entirely. See CodeQL alert #39.
+    return hashlib.sha256(value.encode("utf-8")).hexdigest().upper()  # lgtm[py/weak-sensitive-data-hashing]
 
 
 # EARFCN/ARFCN -> band number fallback, used when firmware reports a carrier's
