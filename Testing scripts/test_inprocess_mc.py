@@ -72,7 +72,7 @@ INFO_ONLY_COMMANDS = [6]  # last SMS -- formatting of the "no SMS" dummy differs
 
 
 def run_via_subprocess(ip, password, username, commands):
-    cmd = ["python3", MC_PATH, ip, password, commands, username or ""]
+    cmd = [sys.executable, MC_PATH, ip, password, commands, username or ""]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
     except subprocess.TimeoutExpired:
