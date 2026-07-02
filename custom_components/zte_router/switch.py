@@ -39,6 +39,10 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
             G5UltraUPnPSwitch(main_coordinator, ip_entry, password_entry),
             G5UltraDMZSwitch(main_coordinator, ip_entry, password_entry),
             G5UltraNATSwitch(main_coordinator, ip_entry, password_entry),
+            G5UltraWiFiBandSwitch(main_coordinator, ip_entry, password_entry, "2g"),
+            G5UltraWiFiBandSwitch(main_coordinator, ip_entry, password_entry, "5g"),
+            G5UltraCellLockSwitch(main_coordinator, ip_entry, password_entry, config_entry.entry_id, "4g"),
+            G5UltraCellLockSwitch(main_coordinator, ip_entry, password_entry, config_entry.entry_id, "5g"),
         ], False)
     else:
         async_add_entities([
@@ -433,3 +437,162 @@ class G5UltraNATSwitch(CoordinatorEntity, SwitchEntity):
             _LOGGER.info("G5 Ultra NAT set enable=%s result=%s", enable, result)
         except Exception as err:
             _LOGGER.error("G5 Ultra NAT toggle failed: %s", err)
+
+
+class G5UltraWiFiBandSwitch(CoordinatorEntity, SwitchEntity):
+    """Per-band (2.4GHz / 5GHz) WiFi on/off switch for G5 Ultra routers.
+
+    Unlike the master "Router WiFi" switch, this only affects one radio,
+    read from the already-fetched wifi_ifaces data (main_2g/main_5g
+    "disabled" flag) -- confirmed live-readable and working.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry, band: str):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+        self._band = band  # "2g" or "5g"
+
+    @property
+    def name(self):
+        return "WiFi 2.4GHz" if self._band == "2g" else "WiFi 5GHz"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_wifi_{self._band}_switch"
+
+    @property
+    def icon(self):
+        return "mdi:wifi" if self.is_on else "mdi:wifi-off"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        return bool(data.get(f"wifi_{self._band}_enabled"))
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_band, True)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_band, False)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _set_band(self, enable: bool):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.set_wifi_band(self._band, enable)
+            _LOGGER.info("G5 Ultra WiFi %s set enable=%s result=%s", self._band, enable, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra WiFi %s toggle failed: %s", self._band, err)
+
+
+class G5UltraCellLockSwitch(CoordinatorEntity, SwitchEntity):
+    """Apply/clear a cell lock for G5 Ultra routers.
+
+    Pairs with the "Cell Lock 4G"/"Cell Lock 5G" text entities (text.py):
+    type a "pci,earfcn" (4G) or "pci,earfcn,band" (5G) value there, then
+    turn this switch on to apply it. Turning off calls
+    reset_band_cell_locks(), which clears ALL band and cell locks (both
+    4G and 5G) -- there is no known API to clear just one.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry, entry_id, technology: str):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+        self._entry_id = entry_id
+        self._technology = technology  # "4g" or "5g"
+
+    @property
+    def name(self):
+        return f"Cell Lock {self._technology.upper()}"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_cell_lock_{self._technology}_switch"
+
+    @property
+    def icon(self):
+        return "mdi:lock" if self.is_on else "mdi:lock-open-outline"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        key = "lock_lte_cell" if self._technology == "4g" else "lock_nr_cell"
+        return bool(str(data.get(key) or "").strip())
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        pending = (
+            self.hass.data.get(DOMAIN, {})
+            .get(self._entry_id, {})
+            .get(f"cell_lock_{self._technology}_text", "")
+        )
+        parts = [p.strip() for p in pending.split(",") if p.strip()]
+        if self._technology == "4g":
+            if len(parts) != 2:
+                _LOGGER.error(
+                    "Cell Lock 4G: expected 'pci,earfcn' in the Cell Lock 4G text field, got %r", pending
+                )
+                return
+            await self.hass.async_add_executor_job(self._lock_lte, parts[0], parts[1])
+        else:
+            if len(parts) != 3:
+                _LOGGER.error(
+                    "Cell Lock 5G: expected 'pci,earfcn,band' in the Cell Lock 5G text field, got %r", pending
+                )
+                return
+            await self.hass.async_add_executor_job(self._lock_nr, parts[0], parts[1], parts[2])
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        await self.hass.async_add_executor_job(self._reset_locks)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _lock_lte(self, pci: str, earfcn: str):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.lock_lte_cell(pci, earfcn)
+            _LOGGER.info("G5 Ultra LTE cell lock pci=%s earfcn=%s result=%s", pci, earfcn, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra LTE cell lock failed: %s", err)
+
+    def _lock_nr(self, pci: str, arfcn: str, band: str):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.lock_nr_cell(pci, arfcn, band)
+            _LOGGER.info("G5 Ultra NR cell lock pci=%s arfcn=%s band=%s result=%s", pci, arfcn, band, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra NR cell lock failed: %s", err)
+
+    def _reset_locks(self):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.reset_band_cell_locks()
+            _LOGGER.info("G5 Ultra band/cell locks reset result=%s", result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra band/cell lock reset failed: %s", err)

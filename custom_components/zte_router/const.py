@@ -830,3 +830,10 @@ SENSOR_NAMES.update({
     "wireless_name": "Wireless Module Name",
     "wan_ipv6_address": "WAN IPv6 Address",
 })
+
+# G5 Ultra: EARFCN/ARFCN-derived band fallback (diagnostic cross-check, not a
+# replacement for the directly-reported band fields).
+SENSOR_NAMES.update({
+    "lte_band_computed": "LTE Band (Computed from EARFCN)",
+    "nr_band_computed": "NR Band (Computed from ARFCN)",
+})

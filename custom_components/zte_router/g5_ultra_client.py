@@ -115,6 +115,69 @@ def sha256_hex(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest().upper()
 
 
+# EARFCN/ARFCN -> band number fallback, used when firmware reports a carrier's
+# frequency channel but not which 3GPP band it corresponds to. Subset of
+# common bands only; returns None for anything outside these ranges.
+_LTE_EARFCN_BANDS = [
+    (1, 0, 599),
+    (3, 1200, 1949),
+    (4, 1950, 2399),
+    (5, 2400, 2649),
+    (7, 2750, 3449),
+    (8, 3450, 3799),
+    (20, 6150, 6449),
+    (28, 9210, 9659),
+    (32, 9920, 10359),
+    (38, 37750, 38249),
+    (40, 38650, 39649),
+    (42, 41590, 43589),
+    (43, 43590, 45589),
+]
+
+_NR_ARFCN_BANDS = [
+    (1, 422000, 434000),
+    (3, 361000, 376000),
+    (5, 173800, 178800),
+    (7, 524000, 538000),
+    (8, 185000, 192000),
+    (28, 151600, 160600),
+    (40, 460000, 480000),
+    (41, 499200, 537999),
+    (75, 286400, 303400),
+    (78, 620000, 653333),
+    (79, 693334, 733333),
+]
+
+
+def convert_lte_earfcn_to_band(earfcn: Optional[int]) -> Optional[int]:
+    if earfcn is None:
+        return None
+    for band, nmin, nmax in _LTE_EARFCN_BANDS:
+        if nmin <= earfcn <= nmax:
+            return band
+    return None
+
+
+def convert_nr_arfcn_to_band(arfcn: Optional[int]) -> Optional[int]:
+    if arfcn is None:
+        return None
+    for band, nmin, nmax in _NR_ARFCN_BANDS:
+        if nmin <= arfcn <= nmax:
+            return band
+    return None
+
+
+def _coerce_optional_int(value: Any) -> Optional[int]:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_band_prefix(prefix: str, band: Optional[int]) -> Optional[str]:
+    return f"{prefix}{band}" if band is not None else None
+
+
 def get_current_time_string() -> str:
     now = datetime.now(timezone.utc).astimezone()
     tz_offset = int(now.utcoffset().total_seconds() / 3600)
@@ -526,6 +589,15 @@ class G5UltraRouterRunner:
         nat_status = self._as_dict(results.get("nat_status"))
         ddns_status = self._as_dict(results.get("ddns_status"))
 
+        wifi_ifaces_raw = self._as_dict(results.get("wifi_ifaces")).get("ifaces")
+        wifi_iface_list = wifi_ifaces_raw if isinstance(wifi_ifaces_raw, list) else []
+        wifi_2g_iface = next(
+            (i for i in wifi_iface_list if isinstance(i, dict) and i.get("section_name") == "main_2g"), {}
+        )
+        wifi_5g_iface = next(
+            (i for i in wifi_iface_list if isinstance(i, dict) and i.get("section_name") == "main_5g"), {}
+        )
+
         summary = {
             "sim_card_number": sim_info.get("msisdn"),
             "imei": device_values.get("imei"),
@@ -560,6 +632,16 @@ class G5UltraRouterRunner:
             "ddns_service": ddns_status.get("service"),
             "ddns_domain": ddns_status.get("domain"),
             "ddns_status_text": ddns_status.get("status"),
+            "wifi_2g_enabled": wifi_2g_iface.get("disabled") == "0",
+            "wifi_5g_enabled": wifi_5g_iface.get("disabled") == "0",
+            "lock_lte_cell": signal_info.get("lock_lte_cell"),
+            "lock_nr_cell": signal_info.get("lock_nr_cell"),
+            "lte_band_computed": _format_band_prefix("B", convert_lte_earfcn_to_band(
+                _coerce_optional_int(signal_info.get("wan_active_channel"))
+            )),
+            "nr_band_computed": _format_band_prefix("n", convert_nr_arfcn_to_band(
+                _coerce_optional_int(signal_info.get("nr5g_action_channel"))
+            )),
         }
         LOGGER.debug(
             "Summary built: wa_inner_version=%s wan_ip=%s signal_keys=%s",
@@ -1059,6 +1141,35 @@ class G5UltraRouterRunner:
         response = self._ubus_call("zwrt_router.api", "router_get_ddns", {}, token)
         result = self._safe_result(response)
         return result if isinstance(result, dict) else {}
+
+    def get_odu_led_status(self) -> Dict[str, Any]:
+        """Read ODU (external unit) LED status. Real vendor 'get' method."""
+        token = self._ensure_token()
+        response = self._ubus_call("zwrt_led", "get_ODU_switch_state", {}, token)
+        result = self._safe_result(response)
+        return result if isinstance(result, dict) else {}
+
+    def set_odu_led(self, enable: bool) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_led",
+            "set_ODU_switch_state",
+            {"switch": "1" if enable else "0", "offtime": "15"},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_wifi_band(self, band: str, enable: bool) -> Dict[str, Any]:
+        """band: '2g' or '5g'. Toggles only that radio, leaving the other alone."""
+        section = "main_2g" if band == "2g" else "main_5g"
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_wlan",
+            "set",
+            {section: {"disabled": "0" if enable else "1"}},
+            token,
+        )
+        return self._safe_result(response)
 
     def send_sms(self, number: str, message: str) -> Dict[str, Any]:
         token = self._ensure_token()

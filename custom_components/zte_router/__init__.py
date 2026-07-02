@@ -210,7 +210,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     firmware_version = coordinator.data.get("wa_inner_version", "Unknown")
 
     # Forward entry setup to relevant platforms, including button
-    await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "switch", "button", "device_tracker"])
+    await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "switch", "button", "device_tracker", "text"])
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
@@ -371,6 +371,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     await hass.config_entries.async_forward_entry_unload(entry, "switch")
     await hass.config_entries.async_forward_entry_unload(entry, "button")
     await hass.config_entries.async_forward_entry_unload(entry, "device_tracker")
+    await hass.config_entries.async_forward_entry_unload(entry, "text")
     hass.data[DOMAIN].pop(entry.entry_id)
     return True
 

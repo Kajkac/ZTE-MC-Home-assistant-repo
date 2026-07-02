@@ -92,7 +92,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         # them here so the generic sensor loop below doesn't create a
         # redundant duplicate sensor for the same underlying state.
         handled_keys.update(
-            ["wifi_onoff", "mobile_data_enable", "upnp_enabled", "dmz_enabled", "dmz_ip", "nat_enabled"]
+            [
+                "wifi_onoff", "mobile_data_enable", "upnp_enabled", "dmz_enabled", "dmz_ip", "nat_enabled",
+                "wifi_2g_enabled", "wifi_5g_enabled", "lock_lte_cell", "lock_nr_cell",
+            ]
         )
 
     # Create and store the SMS coordinator (if not already created)
