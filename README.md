@@ -1,23 +1,13 @@
 <div align="center">
 
-# 📡 ZTE Router Integration for Home Assistant
+# 🛰️ ZTE Router Integration for Home Assistant
 
 **Sensors, diagnostics, and control for ZTE 5G routers — SMS, device tracking, data usage, and more.**
 
 [![GitHub release](https://img.shields.io/github/release/Kajkac/ZTE-MC-Home-assistant-repo.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/)
 [![HACS Default](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 [![License](https://img.shields.io/github/license/Kajkac/ZTE-MC-Home-assistant-repo)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/Kajkac/ZTE-MC-Home-assistant-repo)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/stargazers)
 [![Installs](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=active%20installs&suffix=%20&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.zte_router.total)](https://analytics.home-assistant.io/custom_integrations.json)
-
-[![Hassfest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/hassfest.yml/badge.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/hassfest.yml)
-[![HACS Validation](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/validate.yml/badge.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/validate.yml)
-[![CodeQL](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/codeql.yml/badge.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/codeql.yml)
-[![Release Build](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/main.yml/badge.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/main.yml)
-
-![Contributors](https://img.shields.io/github/contributors/Kajkac/ZTE-MC-Home-assistant-repo)
-![Last Commit](https://img.shields.io/github/last-commit/Kajkac/ZTE-MC-Home-assistant-repo)
-![Commit Activity](https://img.shields.io/github/commit-activity/y/Kajkac/ZTE-MC-Home-assistant-repo)
 
 [Install via HACS](#-installation) · [Supported devices](#-supported-devices) · [Services](#-services) · [Known issues](#-known-issues)
 
@@ -42,7 +32,7 @@ A custom Home Assistant integration for ZTE 5G routers/CPEs — MC-series and G5
 - ⚙️ Guided config flow — pick your model, enter IP/password, done
 - 🧩 Works with or without a router username, depending on model
 
-## 📱 Supported Devices
+## 📋 Supported Devices
 
 | Model family | Config flow selection | Username required? |
 | --- | :---: | :---: |
@@ -102,7 +92,7 @@ Similar/rebadged variants of these chassis families are generally expected to wo
 
 ![Screenshot](https://raw.githubusercontent.com/Kajkac/ZTE-MC-Home-assistant-repo/main/zte.png)
 
-## 📡 Services
+## 🔧 Services
 
 ### `zte_router.send_custom_sms`
 
@@ -117,7 +107,7 @@ Send an SMS to any phone number with any message, independent of the phone numbe
 ```yaml
 action: zte_router.send_custom_sms
 data:
-  phone_number: "0989072702"
+  phone_number: "+15555550100"
   message: "Garage door left open for 10 minutes"
 ```
 
@@ -146,6 +136,11 @@ Not needed for normal use.
 ## 🤝 Contributing
 
 Pull requests welcome. If you're adding a feature or fix, bump the version in `manifest.json` — merges to `main` automatically cut a GitHub release for that version.
+
+[![Hassfest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/hassfest.yml/badge.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/hassfest.yml)
+[![HACS Validation](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/validate.yml/badge.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/validate.yml)
+[![CodeQL](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/codeql.yml/badge.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/codeql.yml)
+![Last Commit](https://img.shields.io/github/last-commit/Kajkac/ZTE-MC-Home-assistant-repo)
 
 ### 🙏 Thanks
 

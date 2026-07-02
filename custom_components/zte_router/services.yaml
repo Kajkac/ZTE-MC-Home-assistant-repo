@@ -47,14 +47,14 @@ send_custom_sms:
     phone_number:
       name: Phone number
       description: Destination phone number.
-      example: "0989072702"
+      example: "+15555550100"
       required: false
       selector:
         text:
     phone:
       name: Phone (alias)
       description: Alias for phone_number. Provide either this or phone_number.
-      example: "0989072702"
+      example: "+15555550100"
       required: false
       selector:
         text:
