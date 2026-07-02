@@ -11,6 +11,7 @@ from .const import (
     ROUTER_TYPE_MC888,
     ROUTER_TYPE_MC889,
 )
+from .g5_ultra_client import G5UltraRouterRunner
 from .router_backend import run_router_commands
 
 _LOGGER = logging.getLogger(__name__)
@@ -31,9 +32,19 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         else None
     )
 
-    # WiFi switch is only supported on MC-series routers.
-    # G5 Ultra uses a different (ubus) API; its WiFi toggle is not yet implemented.
-    if router_type != ROUTER_TYPE_G5_ULTRA:
+    if router_type == ROUTER_TYPE_G5_ULTRA:
+        async_add_entities([
+            G5UltraWiFiSwitch(main_coordinator, ip_entry, password_entry),
+            G5UltraMobileDataSwitch(main_coordinator, ip_entry, password_entry),
+            G5UltraUPnPSwitch(main_coordinator, ip_entry, password_entry),
+            G5UltraDMZSwitch(main_coordinator, ip_entry, password_entry),
+            G5UltraNATSwitch(main_coordinator, ip_entry, password_entry),
+            G5UltraWiFiBandSwitch(main_coordinator, ip_entry, password_entry, "2g"),
+            G5UltraWiFiBandSwitch(main_coordinator, ip_entry, password_entry, "5g"),
+            G5UltraCellLockSwitch(main_coordinator, ip_entry, password_entry, config_entry.entry_id, "4g"),
+            G5UltraCellLockSwitch(main_coordinator, ip_entry, password_entry, config_entry.entry_id, "5g"),
+        ], False)
+    else:
         async_add_entities([
             WiFiSwitch(main_coordinator, ip_entry, password_entry, username_entry, router_type)
         ], False)
@@ -116,3 +127,472 @@ class WiFiSwitch(CoordinatorEntity, SwitchEntity):
             _LOGGER.info("WiFi toggle command %s output: %s", command, result)
         except Exception as err:
             _LOGGER.error("WiFi toggle command %s failed: %s", command, err)
+
+
+class G5UltraWiFiSwitch(CoordinatorEntity, SwitchEntity):
+    """WiFi on/off switch for G5 Ultra routers.
+
+    Uses ubus zwrt_wlan.set (zte_mbb.wifi_onoff). Not yet field-verified --
+    beta feature, discovered via reverse-engineering research on related
+    G5-family hardware.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+
+    @property
+    def name(self):
+        return "Router WiFi"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_wifi_switch"
+
+    @property
+    def icon(self):
+        return "mdi:wifi" if self.is_on else "mdi:wifi-off"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        return str(data.get("wifi_onoff", "0")) == "1"
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_wifi, True)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_wifi, False)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _set_wifi(self, enable: bool):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.set_wifi(enable)
+            _LOGGER.info("G5 Ultra WiFi set enable=%s result=%s", enable, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra WiFi toggle failed: %s", err)
+
+
+class G5UltraMobileDataSwitch(CoordinatorEntity, SwitchEntity):
+    """Mobile data (WWAN) on/off switch for G5 Ultra routers.
+
+    Uses ubus zwrt_data.set_wwaniface. Not yet field-verified -- beta
+    feature, discovered via reverse-engineering research on related
+    G5-family hardware.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+
+    @property
+    def name(self):
+        return "Mobile Data"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_mobile_data_switch"
+
+    @property
+    def icon(self):
+        return "mdi:signal-cellular-3" if self.is_on else "mdi:signal-cellular-outline"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        return str(data.get("mobile_data_enable", "0")) == "1"
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_mobile_data, True)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_mobile_data, False)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _set_mobile_data(self, enable: bool):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.set_mobile_data(enable)
+            _LOGGER.info("G5 Ultra mobile data set enable=%s result=%s", enable, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra mobile data toggle failed: %s", err)
+
+
+class G5UltraUPnPSwitch(CoordinatorEntity, SwitchEntity):
+    """UPnP on/off switch for G5 Ultra routers.
+
+    Read via uci.get(config=upnpd) since no vendor 'get' API exists for
+    this. Beta -- confirmed live-readable, but the write side is not yet
+    field-verified.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+
+    @property
+    def name(self):
+        return "UPnP"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_upnp_switch"
+
+    @property
+    def icon(self):
+        return "mdi:upnp"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        return bool(data.get("upnp_enabled"))
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_upnp, True)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_upnp, False)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _set_upnp(self, enable: bool):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.set_upnp(enable)
+            _LOGGER.info("G5 Ultra UPnP set enable=%s result=%s", enable, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra UPnP toggle failed: %s", err)
+
+
+class G5UltraDMZSwitch(CoordinatorEntity, SwitchEntity):
+    """DMZ on/off switch for G5 Ultra routers.
+
+    Read from the firewall UCI config's "DMZ" redirect rule. Turning on
+    without a previously-known target IP will fail cleanly rather than
+    guess an address; use the set_dmz service to (re)configure the
+    target IP, then this switch can toggle it on/off.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+
+    @property
+    def name(self):
+        return "DMZ"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_dmz_switch"
+
+    @property
+    def icon(self):
+        return "mdi:server-security"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        return bool(data.get("dmz_enabled"))
+
+    @property
+    def extra_state_attributes(self):
+        data = self.coordinator.data or {}
+        return {"dmz_ip": data.get("dmz_ip")}
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        dmz_ip = (self.coordinator.data or {}).get("dmz_ip") or ""
+        if not dmz_ip:
+            _LOGGER.error(
+                "G5 Ultra DMZ: no known target IP to re-enable DMZ with; "
+                "use the zte_router.set_dmz service to set one first."
+            )
+            return
+        await self.hass.async_add_executor_job(self._set_dmz, True, dmz_ip)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        dmz_ip = (self.coordinator.data or {}).get("dmz_ip") or ""
+        await self.hass.async_add_executor_job(self._set_dmz, False, dmz_ip)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _set_dmz(self, enable: bool, dmz_ip: str):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.set_dmz(enable, dmz_ip)
+            _LOGGER.info("G5 Ultra DMZ set enable=%s dmz_ip=%s result=%s", enable, dmz_ip, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra DMZ toggle failed: %s", err)
+
+
+class G5UltraNATSwitch(CoordinatorEntity, SwitchEntity):
+    """NAT on/off switch for G5 Ultra routers.
+
+    Experimental: reads the WAN zone's firewall "masq" flag, which is not
+    fully confirmed to be what router_set_nat_switch actually toggles --
+    especially in LTE bridge mode, where masquerading may be structurally
+    disabled regardless of this switch. Treat with caution.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+
+    @property
+    def name(self):
+        return "NAT (experimental)"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_nat_switch"
+
+    @property
+    def icon(self):
+        return "mdi:router-network" if self.is_on else "mdi:router-network-off"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        return bool(data.get("nat_enabled"))
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_nat, True)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_nat, False)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _set_nat(self, enable: bool):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.set_nat(enable)
+            _LOGGER.info("G5 Ultra NAT set enable=%s result=%s", enable, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra NAT toggle failed: %s", err)
+
+
+class G5UltraWiFiBandSwitch(CoordinatorEntity, SwitchEntity):
+    """Per-band (2.4GHz / 5GHz) WiFi on/off switch for G5 Ultra routers.
+
+    Unlike the master "Router WiFi" switch, this only affects one radio,
+    read from the already-fetched wifi_ifaces data (main_2g/main_5g
+    "disabled" flag) -- confirmed live-readable and working.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry, band: str):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+        self._band = band  # "2g" or "5g"
+
+    @property
+    def name(self):
+        return "WiFi 2.4GHz" if self._band == "2g" else "WiFi 5GHz"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_wifi_{self._band}_switch"
+
+    @property
+    def icon(self):
+        return "mdi:wifi" if self.is_on else "mdi:wifi-off"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        return bool(data.get(f"wifi_{self._band}_enabled"))
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_band, True)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        await self.hass.async_add_executor_job(self._set_band, False)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _set_band(self, enable: bool):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.set_wifi_band(self._band, enable)
+            _LOGGER.info("G5 Ultra WiFi %s set enable=%s result=%s", self._band, enable, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra WiFi %s toggle failed: %s", self._band, err)
+
+
+class G5UltraCellLockSwitch(CoordinatorEntity, SwitchEntity):
+    """Apply/clear a cell lock for G5 Ultra routers.
+
+    Pairs with the "Cell Lock 4G"/"Cell Lock 5G" text entities (text.py):
+    type a "pci,earfcn" (4G) or "pci,earfcn,band" (5G) value there, then
+    turn this switch on to apply it. Turning off calls
+    reset_band_cell_locks(), which clears ALL band and cell locks (both
+    4G and 5G) -- there is no known API to clear just one.
+    """
+
+    def __init__(self, coordinator, ip_entry, password_entry, entry_id, technology: str):
+        super().__init__(coordinator)
+        self._ip = ip_entry
+        self._password = password_entry
+        self._entry_id = entry_id
+        self._technology = technology  # "4g" or "5g"
+
+    @property
+    def name(self):
+        return f"Cell Lock {self._technology.upper()}"
+
+    @property
+    def unique_id(self):
+        return f"{DOMAIN}_{self._ip}_g5ultra_cell_lock_{self._technology}_switch"
+
+    @property
+    def icon(self):
+        return "mdi:lock" if self.is_on else "mdi:lock-open-outline"
+
+    @property
+    def is_on(self):
+        data = self.coordinator.data or {}
+        key = "lock_lte_cell" if self._technology == "4g" else "lock_nr_cell"
+        return bool(str(data.get(key) or "").strip())
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, f"{DOMAIN}_{self._ip}")},
+            "name": self._ip,
+            "manufacturer": MANUFACTURER,
+            "model": MODEL,
+            "sw_version": (self.coordinator.data or {}).get("wa_inner_version", "Unknown"),
+        }
+
+    async def async_turn_on(self, **kwargs):
+        pending = (
+            self.hass.data.get(DOMAIN, {})
+            .get(self._entry_id, {})
+            .get(f"cell_lock_{self._technology}_text", "")
+        )
+        parts = [p.strip() for p in pending.split(",") if p.strip()]
+        if self._technology == "4g":
+            if len(parts) != 2:
+                _LOGGER.error(
+                    "Cell Lock 4G: expected 'pci,earfcn' in the Cell Lock 4G text field, got %r", pending
+                )
+                return
+            await self.hass.async_add_executor_job(self._lock_lte, parts[0], parts[1])
+        else:
+            if len(parts) != 3:
+                _LOGGER.error(
+                    "Cell Lock 5G: expected 'pci,earfcn,band' in the Cell Lock 5G text field, got %r", pending
+                )
+                return
+            await self.hass.async_add_executor_job(self._lock_nr, parts[0], parts[1], parts[2])
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs):
+        await self.hass.async_add_executor_job(self._reset_locks)
+        await asyncio.sleep(3)
+        await self.coordinator.async_request_refresh()
+
+    def _lock_lte(self, pci: str, earfcn: str):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.lock_lte_cell(pci, earfcn)
+            _LOGGER.info("G5 Ultra LTE cell lock pci=%s earfcn=%s result=%s", pci, earfcn, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra LTE cell lock failed: %s", err)
+
+    def _lock_nr(self, pci: str, arfcn: str, band: str):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.lock_nr_cell(pci, arfcn, band)
+            _LOGGER.info("G5 Ultra NR cell lock pci=%s arfcn=%s band=%s result=%s", pci, arfcn, band, result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra NR cell lock failed: %s", err)
+
+    def _reset_locks(self):
+        try:
+            runner = G5UltraRouterRunner(self._ip, self._password)
+            result = runner.reset_band_cell_locks()
+            _LOGGER.info("G5 Ultra band/cell locks reset result=%s", result)
+        except Exception as err:
+            _LOGGER.error("G5 Ultra band/cell lock reset failed: %s", err)

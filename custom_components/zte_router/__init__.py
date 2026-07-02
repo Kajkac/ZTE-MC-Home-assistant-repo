@@ -45,6 +45,121 @@ SERVICE_SEND_CUSTOM_SMS_SCHEMA = vol.Schema(
         vol.Required("message"): cv.string,
     }
 )
+SERVICE_SET_NETWORK_MODE = "set_network_mode"
+SERVICE_SET_NETWORK_MODE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("mode"): vol.In(["ONLY_3G", "ONLY_4G", "ONLY_5G", "4G_AND_5G"]),
+    }
+)
+SERVICE_LOCK_CELL = "lock_cell"
+SERVICE_LOCK_CELL_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("technology"): vol.In(["4g", "5g"]),
+        vol.Required("pci"): cv.string,
+        vol.Required("earfcn"): cv.string,
+        vol.Optional("band"): cv.string,
+    }
+)
+SERVICE_SET_BAND_LOCK = "set_band_lock"
+SERVICE_SET_BAND_LOCK_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("technology"): vol.In(["4g", "5g"]),
+        vol.Optional("band_mask"): cv.string,
+        vol.Optional("nr_type"): vol.In(["nsa", "sa"]),
+        vol.Optional("bands"): cv.string,
+    }
+)
+SERVICE_RESET_BAND_CELL_LOCKS = "reset_band_cell_locks"
+SERVICE_RESET_BAND_CELL_LOCKS_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+    }
+)
+SERVICE_SEND_USSD = "send_ussd"
+SERVICE_SEND_USSD_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("code"): cv.string,
+    }
+)
+SERVICE_SET_FIREWALL = "set_firewall"
+SERVICE_SET_FIREWALL_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("enable"): cv.boolean,
+    }
+)
+SERVICE_SET_NAT = "set_nat"
+SERVICE_SET_NAT_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("enable"): cv.boolean,
+    }
+)
+SERVICE_SET_UPNP = "set_upnp"
+SERVICE_SET_UPNP_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("enable"): cv.boolean,
+    }
+)
+SERVICE_SET_DMZ = "set_dmz"
+SERVICE_SET_DMZ_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("enable"): cv.boolean,
+        vol.Optional("dmz_ip", default=""): cv.string,
+    }
+)
+SERVICE_SET_WAN_DNS = "set_wan_dns"
+SERVICE_SET_WAN_DNS_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("mode"): vol.In(["auto", "manual"]),
+        vol.Optional("prefer_dns", default=""): cv.string,
+        vol.Optional("standby_dns", default=""): cv.string,
+    }
+)
+SERVICE_SET_WAN_MTU = "set_wan_mtu"
+SERVICE_SET_WAN_MTU_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("mtu"): vol.All(vol.Coerce(int), vol.Range(min=576, max=9000)),
+    }
+)
+SERVICE_SET_DDNS = "set_ddns"
+SERVICE_SET_DDNS_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("enable"): cv.boolean,
+        vol.Optional("service", default=""): cv.string,
+        vol.Optional("domain", default=""): cv.string,
+        vol.Optional("account", default=""): cv.string,
+        vol.Optional("password", default=""): cv.string,
+    }
+)
+SERVICE_SET_APN_MODE = "set_apn_mode"
+SERVICE_SET_APN_MODE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("mode"): vol.In(["auto", "manual"]),
+    }
+)
+SERVICE_ADD_APN_PROFILE = "add_apn_profile"
+SERVICE_ADD_APN_PROFILE_SCHEMA = vol.Schema(
+    {
+        vol.Optional("entry_id"): cv.string,
+        vol.Required("profile_name"): cv.string,
+        vol.Required("apn"): cv.string,
+        vol.Optional("username", default=""): cv.string,
+        vol.Optional("password", default=""): cv.string,
+        vol.Optional("pdp_type", default="ipv4"): vol.In(["ipv4", "ipv6", "both"]),
+        vol.Optional("auth_mode", default="none"): vol.In(["none", "pap", "chap"]),
+    }
+)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up ZTE Router from a config entry."""
@@ -95,7 +210,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     firmware_version = coordinator.data.get("wa_inner_version", "Unknown")
 
     # Forward entry setup to relevant platforms, including button
-    await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "switch", "button", "device_tracker"])
+    await hass.config_entries.async_forward_entry_setups(entry, ["sensor", "switch", "button", "device_tracker", "text"])
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
@@ -256,6 +371,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     await hass.config_entries.async_forward_entry_unload(entry, "switch")
     await hass.config_entries.async_forward_entry_unload(entry, "button")
     await hass.config_entries.async_forward_entry_unload(entry, "device_tracker")
+    await hass.config_entries.async_forward_entry_unload(entry, "text")
     hass.data[DOMAIN].pop(entry.entry_id)
     return True
 
@@ -366,6 +482,186 @@ def _ensure_services_registered(hass: HomeAssistant) -> None:
 
         _LOGGER.info("send_custom_sms: sent SMS via entry %s", entry.entry_id)
 
+    def _resolve_g5_ultra_runner(call: ServiceCall) -> G5UltraRouterRunner:
+        entry = _resolve_config_entry(hass, call.data.get("entry_id"))
+        merged = {**entry.data, **entry.options}
+        if merged.get("router_type") != ROUTER_TYPE_G5_ULTRA:
+            raise HomeAssistantError("This service is only available for G5 Ultra router entries.")
+        return G5UltraRouterRunner(merged["router_ip"], merged["router_password"])
+
+    async def async_handle_set_network_mode(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.set_network_mode, call.data["mode"])
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set network mode: {err}") from err
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to set network mode: {result['error']}")
+
+    async def async_handle_lock_cell(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        technology = call.data["technology"]
+        try:
+            if technology == "4g":
+                result = await hass.async_add_executor_job(
+                    runner.lock_lte_cell, call.data["pci"], call.data["earfcn"]
+                )
+            else:
+                band = call.data.get("band")
+                if not band:
+                    raise HomeAssistantError("lock_cell: 'band' is required for technology '5g'")
+                result = await hass.async_add_executor_job(
+                    runner.lock_nr_cell, call.data["pci"], call.data["earfcn"], band
+                )
+        except HomeAssistantError:
+            raise
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to lock cell: {err}") from err
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to lock cell: {result['error']}")
+
+    async def async_handle_set_band_lock(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        technology = call.data["technology"]
+        try:
+            if technology == "4g":
+                band_mask = call.data.get("band_mask")
+                if not band_mask:
+                    raise HomeAssistantError("set_band_lock: 'band_mask' is required for technology '4g'")
+                result = await hass.async_add_executor_job(runner.set_lte_band_lock, band_mask)
+            else:
+                nr_type = call.data.get("nr_type")
+                bands = call.data.get("bands")
+                if not nr_type or not bands:
+                    raise HomeAssistantError("set_band_lock: 'nr_type' and 'bands' are required for technology '5g'")
+                result = await hass.async_add_executor_job(runner.set_nr_band_lock, nr_type, bands)
+        except HomeAssistantError:
+            raise
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set band lock: {err}") from err
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to set band lock: {result['error']}")
+
+    async def async_handle_reset_band_cell_locks(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.reset_band_cell_locks)
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to reset band/cell locks: {err}") from err
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to reset band/cell locks: {result['error']}")
+
+    async def async_handle_send_ussd(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.send_ussd, call.data["code"])
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to send USSD code: {err}") from err
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to send USSD code: {result['error']}")
+        hass.bus.async_fire(f"{DOMAIN}_ussd_response", {"code": call.data["code"], "result": result})
+
+    def _raise_if_error(result, action: str):
+        if isinstance(result, dict) and result.get("error"):
+            raise HomeAssistantError(f"Failed to {action}: {result['error']}")
+
+    async def async_handle_set_firewall(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.set_firewall, call.data["enable"])
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set firewall: {err}") from err
+        _raise_if_error(result, "set firewall")
+
+    async def async_handle_set_nat(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.set_nat, call.data["enable"])
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set NAT: {err}") from err
+        _raise_if_error(result, "set NAT")
+
+    async def async_handle_set_upnp(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.set_upnp, call.data["enable"])
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set UPnP: {err}") from err
+        _raise_if_error(result, "set UPnP")
+
+    async def async_handle_set_dmz(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(
+                runner.set_dmz, call.data["enable"], call.data.get("dmz_ip", "")
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set DMZ: {err}") from err
+        _raise_if_error(result, "set DMZ")
+
+    async def async_handle_set_wan_dns(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(
+                runner.set_wan_dns,
+                call.data["mode"],
+                call.data.get("prefer_dns", ""),
+                call.data.get("standby_dns", ""),
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set WAN DNS: {err}") from err
+        _raise_if_error(result, "set WAN DNS")
+
+    async def async_handle_set_wan_mtu(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(runner.set_wan_mtu, call.data["mtu"])
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set WAN MTU: {err}") from err
+        _raise_if_error(result, "set WAN MTU")
+
+    async def async_handle_set_ddns(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        try:
+            result = await hass.async_add_executor_job(
+                runner.set_ddns,
+                call.data["enable"],
+                call.data.get("service", ""),
+                call.data.get("domain", ""),
+                call.data.get("account", ""),
+                call.data.get("password", ""),
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set DDNS: {err}") from err
+        _raise_if_error(result, "set DDNS")
+
+    async def async_handle_set_apn_mode(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        mode_code = "1" if call.data["mode"] == "manual" else "0"
+        try:
+            result = await hass.async_add_executor_job(runner.set_apn_mode, mode_code)
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to set APN mode: {err}") from err
+        _raise_if_error(result, "set APN mode")
+
+    async def async_handle_add_apn_profile(call: ServiceCall):
+        runner = _resolve_g5_ultra_runner(call)
+        pdp_type_map = {"ipv4": 0, "ipv6": 1, "both": 2}
+        auth_mode_map = {"none": 0, "pap": 1, "chap": 2}
+        try:
+            result = await hass.async_add_executor_job(
+                runner.add_apn_profile,
+                call.data["profile_name"],
+                call.data["apn"],
+                call.data.get("username", ""),
+                call.data.get("password", ""),
+                pdp_type_map[call.data.get("pdp_type", "ipv4")],
+                auth_mode_map[call.data.get("auth_mode", "none")],
+            )
+        except Exception as err:
+            raise HomeAssistantError(f"Failed to add APN profile: {err}") from err
+        _raise_if_error(result, "add APN profile")
+
     hass.services.async_register(
         DOMAIN,
         SERVICE_UBUS_CALL,
@@ -377,5 +673,89 @@ def _ensure_services_registered(hass: HomeAssistant) -> None:
         SERVICE_SEND_CUSTOM_SMS,
         async_handle_send_custom_sms,
         schema=SERVICE_SEND_CUSTOM_SMS_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_NETWORK_MODE,
+        async_handle_set_network_mode,
+        schema=SERVICE_SET_NETWORK_MODE_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_LOCK_CELL,
+        async_handle_lock_cell,
+        schema=SERVICE_LOCK_CELL_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_BAND_LOCK,
+        async_handle_set_band_lock,
+        schema=SERVICE_SET_BAND_LOCK_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_RESET_BAND_CELL_LOCKS,
+        async_handle_reset_band_cell_locks,
+        schema=SERVICE_RESET_BAND_CELL_LOCKS_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SEND_USSD,
+        async_handle_send_ussd,
+        schema=SERVICE_SEND_USSD_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_FIREWALL,
+        async_handle_set_firewall,
+        schema=SERVICE_SET_FIREWALL_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_NAT,
+        async_handle_set_nat,
+        schema=SERVICE_SET_NAT_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_UPNP,
+        async_handle_set_upnp,
+        schema=SERVICE_SET_UPNP_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_DMZ,
+        async_handle_set_dmz,
+        schema=SERVICE_SET_DMZ_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_WAN_DNS,
+        async_handle_set_wan_dns,
+        schema=SERVICE_SET_WAN_DNS_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_WAN_MTU,
+        async_handle_set_wan_mtu,
+        schema=SERVICE_SET_WAN_MTU_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_DDNS,
+        async_handle_set_ddns,
+        schema=SERVICE_SET_DDNS_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_SET_APN_MODE,
+        async_handle_set_apn_mode,
+        schema=SERVICE_SET_APN_MODE_SCHEMA,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_ADD_APN_PROFILE,
+        async_handle_add_apn_profile,
+        schema=SERVICE_ADD_APN_PROFILE_SCHEMA,
     )
     storage[SERVICE_REG_KEY] = True

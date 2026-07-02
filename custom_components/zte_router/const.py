@@ -760,3 +760,80 @@ FLUX_ICON_MAP = {
     "flux_total_tx_error_packets": "mdi:alert-octagon",
     "flux_total_rx_error_packets": "mdi:alert-octagon-outline",
 }
+
+# G5 Ultra beta: DDNS is read-only (no way to safely write the password back
+# via a switch), so it's exposed as plain sensors via the generic sensor loop
+# in sensor.py rather than a dedicated switch entity.
+SENSOR_NAMES.update({
+    "ddns_enabled": "DDNS Enabled",
+    "ddns_service": "DDNS Service",
+    "ddns_domain": "DDNS Domain",
+    "ddns_status_text": "DDNS Status",
+})
+
+# G5 Ultra: friendly names for fields that were falling back to their raw
+# ubus/UCI key names in the sensor list.
+SENSOR_NAMES.update({
+    "boot_version": "Boot Version",
+    "cid": "Connection ID",
+    "connect_fail_count": "Connection Fail Count",
+    "connect_mode": "Connect Mode",
+    "connect_status": "Connection Status",
+    "devui_get_sim_info": "SIM Info (Raw)",
+    "domain_stat": "Domain Status",
+    "enable": "WWAN Enabled",
+    "error": "Error",
+    "gw_band_lock": "GW Band Lock",
+    "integrate_version": "Integrate Version",
+    "ipv4_address": "IPv4 WAN Address",
+    "ipv4_dev_name": "IPv4 Device Name",
+    "ipv4_dns_prefer": "IPv4 Preferred DNS",
+    "ipv4_dns_standby": "IPv4 Standby DNS",
+    "ipv4_gateway": "IPv4 Gateway",
+    "ipv4_netmask": "IPv4 Netmask",
+    "ipv6_address": "IPv6 WAN Address",
+    "ipv6_dev_name": "IPv6 Device Name",
+    "ipv6_dns_prefer": "IPv6 Preferred DNS",
+    "ipv6_dns_standby": "IPv6 Standby DNS",
+    "ipv6_gateway": "IPv6 Gateway",
+    "lac_code": "LAC Code",
+    "lock_lte_cell": "LTE Cell Lock",
+    "lock_nr_cell": "5G NR Cell Lock",
+    "lte_band_lock": "LTE Band Lock",
+    "lte_neighbor_cell": "LTE Neighbor Cells",
+    "lteca": "LTE Carrier Aggregation",
+    "lteca_state": "LTE CA State",
+    "ltecasig": "LTE CA Signal",
+    "manufacturer": "Manufacturer",
+    "model_name": "Model Name",
+    "net_select": "Network Selection Mode",
+    "net_select_mode": "Network Selection Sub-Mode",
+    "nitz_sync_flag": "NITZ Sync Enabled",
+    "nitz_timezone": "NITZ Timezone",
+    "nr5g_bandwidth": "5G NR Bandwidth",
+    "nr5g_nrdc_band_lock": "5G NR-DC Band Lock",
+    "nr5g_rsrp": "5G NR RSRP",
+    "nr5g_rsrq": "5G NR RSRQ",
+    "nr5g_rssi": "5G NR RSSI",
+    "nr5g_snr": "5G NR SNR",
+    "nrca": "5G NR Carrier Aggregation",
+    "nr_neighbor_cell": "5G NR Neighbor Cells",
+    "pin_manage_at_wait": "PIN Management Pending",
+    "pin_manage_result": "PIN Management Result",
+    "pin_puk_at_wait": "PUK Management Pending",
+    "roam_enable": "Roaming Enabled",
+    "roll_connect_status": "Rollback Connect Status",
+    "sim_card_number": "SIM Card Number",
+    "sim_gid1": "SIM GID1",
+    "sim_gid1_string": "SIM GID1 String",
+    "wa_module_version": "WA Module Version",
+    "wireless_name": "Wireless Module Name",
+    "wan_ipv6_address": "WAN IPv6 Address",
+})
+
+# G5 Ultra: EARFCN/ARFCN-derived band fallback (diagnostic cross-check, not a
+# replacement for the directly-reported band fields).
+SENSOR_NAMES.update({
+    "lte_band_computed": "LTE Band (Computed from EARFCN)",
+    "nr_band_computed": "NR Band (Computed from ARFCN)",
+})

@@ -115,6 +115,69 @@ def sha256_hex(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest().upper()
 
 
+# EARFCN/ARFCN -> band number fallback, used when firmware reports a carrier's
+# frequency channel but not which 3GPP band it corresponds to. Subset of
+# common bands only; returns None for anything outside these ranges.
+_LTE_EARFCN_BANDS = [
+    (1, 0, 599),
+    (3, 1200, 1949),
+    (4, 1950, 2399),
+    (5, 2400, 2649),
+    (7, 2750, 3449),
+    (8, 3450, 3799),
+    (20, 6150, 6449),
+    (28, 9210, 9659),
+    (32, 9920, 10359),
+    (38, 37750, 38249),
+    (40, 38650, 39649),
+    (42, 41590, 43589),
+    (43, 43590, 45589),
+]
+
+_NR_ARFCN_BANDS = [
+    (1, 422000, 434000),
+    (3, 361000, 376000),
+    (5, 173800, 178800),
+    (7, 524000, 538000),
+    (8, 185000, 192000),
+    (28, 151600, 160600),
+    (40, 460000, 480000),
+    (41, 499200, 537999),
+    (75, 286400, 303400),
+    (78, 620000, 653333),
+    (79, 693334, 733333),
+]
+
+
+def convert_lte_earfcn_to_band(earfcn: Optional[int]) -> Optional[int]:
+    if earfcn is None:
+        return None
+    for band, nmin, nmax in _LTE_EARFCN_BANDS:
+        if nmin <= earfcn <= nmax:
+            return band
+    return None
+
+
+def convert_nr_arfcn_to_band(arfcn: Optional[int]) -> Optional[int]:
+    if arfcn is None:
+        return None
+    for band, nmin, nmax in _NR_ARFCN_BANDS:
+        if nmin <= arfcn <= nmax:
+            return band
+    return None
+
+
+def _coerce_optional_int(value: Any) -> Optional[int]:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_band_prefix(prefix: str, band: Optional[int]) -> Optional[str]:
+    return f"{prefix}{band}" if band is not None else None
+
+
 def get_current_time_string() -> str:
     now = datetime.now(timezone.utc).astimezone()
     tz_offset = int(now.utcoffset().total_seconds() / 3600)
@@ -404,6 +467,18 @@ class G5UltraRouterRunner:
             results["sms_capacity_raw"] = sms_capacity_data
             results["sms_capacity_flat"] = sms_capacity_flat
 
+        for name, getter in (
+            ("upnp_status", self.get_upnp_status),
+            ("dmz_status", self.get_dmz_status),
+            ("nat_status", self.get_nat_status),
+            ("ddns_status", self.get_ddns_status),
+        ):
+            try:
+                results[name] = getter()
+            except Exception as exc:
+                LOGGER.warning("G5 Ultra call %s failed: %s", name, exc)
+                results[name] = {"error": str(exc)}
+
         results["summary"] = self.build_gather_summary(results)
         if sms_capacity_flat:
             results["summary"].update(sms_capacity_flat)
@@ -488,14 +563,40 @@ class G5UltraRouterRunner:
         LOGGER.debug("Collected %s offline clients", len(records))
         return records
 
+    @staticmethod
+    def _as_dict(value: Any) -> Dict[str, Any]:
+        """Coerce a gather-results entry to a dict.
+
+        _safe_result() falls back to returning the raw ubus envelope (a
+        list) when a call errors out (e.g. "Object not found" on
+        firmware that doesn't expose that module), so callers must not
+        assume dict-shaped results just because the key is present.
+        """
+        return value if isinstance(value, dict) else {}
+
     def build_gather_summary(self, results: Dict[str, Any]) -> Dict[str, Any]:
-        sim_info = results.get("sim_info") or {}
-        router_status = results.get("router_status") or {}
-        wwan = results.get("wwan_iface") or {}
-        sms_settings = results.get("sms_settings") or {}
+        sim_info = self._as_dict(results.get("sim_info"))
+        router_status = self._as_dict(results.get("router_status"))
+        wwan = self._as_dict(results.get("wwan_iface"))
+        sms_settings = self._as_dict(results.get("sms_settings"))
         device_values = extract_device_values(results.get("device_info"))
         common_values = extract_values(results.get("common_config"))
-        signal_info = results.get("signal_info") or {}
+        signal_info = self._as_dict(results.get("signal_info"))
+        wifi_global = self._as_dict(results.get("wifi_global"))
+        wifi_status = self._as_dict(results.get("wifi_status"))
+        upnp_status = self._as_dict(results.get("upnp_status"))
+        dmz_status = self._as_dict(results.get("dmz_status"))
+        nat_status = self._as_dict(results.get("nat_status"))
+        ddns_status = self._as_dict(results.get("ddns_status"))
+
+        wifi_ifaces_raw = self._as_dict(results.get("wifi_ifaces")).get("ifaces")
+        wifi_iface_list = wifi_ifaces_raw if isinstance(wifi_ifaces_raw, list) else []
+        wifi_2g_iface = next(
+            (i for i in wifi_iface_list if isinstance(i, dict) and i.get("section_name") == "main_2g"), {}
+        )
+        wifi_5g_iface = next(
+            (i for i in wifi_iface_list if isinstance(i, dict) and i.get("section_name") == "main_5g"), {}
+        )
 
         summary = {
             "sim_card_number": sim_info.get("msisdn"),
@@ -521,6 +622,26 @@ class G5UltraRouterRunner:
             "device_alias_name": common_values.get("device_alias_name"),
             "sms_center": sms_settings.get("sca"),
             "signal_info": signal_info,
+            "wifi_onoff": wifi_status.get("wifi_onoff", wifi_global.get("wifi_onoff")),
+            "mobile_data_enable": wwan.get("enable"),
+            "upnp_enabled": upnp_status.get("enabled"),
+            "dmz_enabled": dmz_status.get("enabled"),
+            "dmz_ip": dmz_status.get("dest_ip"),
+            "nat_enabled": nat_status.get("enabled"),
+            "ddns_enabled": ddns_status.get("enable") == 1 or ddns_status.get("enable") is True,
+            "ddns_service": ddns_status.get("service"),
+            "ddns_domain": ddns_status.get("domain"),
+            "ddns_status_text": ddns_status.get("status"),
+            "wifi_2g_enabled": wifi_2g_iface.get("disabled") == "0",
+            "wifi_5g_enabled": wifi_5g_iface.get("disabled") == "0",
+            "lock_lte_cell": signal_info.get("lock_lte_cell"),
+            "lock_nr_cell": signal_info.get("lock_nr_cell"),
+            "lte_band_computed": _format_band_prefix("B", convert_lte_earfcn_to_band(
+                _coerce_optional_int(signal_info.get("wan_active_channel"))
+            )),
+            "nr_band_computed": _format_band_prefix("n", convert_nr_arfcn_to_band(
+                _coerce_optional_int(signal_info.get("nr5g_action_channel"))
+            )),
         }
         LOGGER.debug(
             "Summary built: wa_inner_version=%s wan_ip=%s signal_keys=%s",
@@ -751,6 +872,301 @@ class G5UltraRouterRunner:
             "zwrt_mc.device.manager",
             "device_reboot",
             {"moduleName": "web"},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_mobile_data(self, enable: bool) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_data",
+            "set_wwaniface",
+            {"source_module": "web", "cid": 1, "enable": 1 if enable else 0},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_wifi(self, enable: bool) -> Dict[str, Any]:
+        token = self._ensure_token()
+        params = {"zte_mbb": {"wifi_onoff": "1" if enable else "0"}}
+        if enable:
+            params["zte_mbb"]["lbd"] = "1"
+            params["zte_mbb"]["mlo"] = "0"
+        response = self._ubus_call("zwrt_wlan", "set", params, token)
+        return self._safe_result(response)
+
+    def set_network_mode(self, mode: str) -> Dict[str, Any]:
+        """mode: one of ONLY_3G, ONLY_4G, ONLY_5G, 4G_AND_5G."""
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zte_nwinfo_api",
+            "nwinfo_set_netselect",
+            {"net_select": mode},
+            token,
+        )
+        return self._safe_result(response)
+
+    def lock_lte_cell(self, pci: str, earfcn: str) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zte_nwinfo_api",
+            "nwinfo_lock_lte_cell",
+            {"lock_lte_pci": pci, "lock_lte_earfcn": earfcn},
+            token,
+        )
+        return self._safe_result(response)
+
+    def lock_nr_cell(self, pci: str, arfcn: str, band: str) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zte_nwinfo_api",
+            "nwinfo_lock_nr_cell",
+            {"lock_nr_pci": pci, "lock_nr_earfcn": arfcn, "lock_nr_cell_band": band},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_lte_band_lock(self, band_mask: str) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zte_nwinfo_api",
+            "nwinfo_set_gwl_bandlock",
+            {
+                "is_lte_band": "1",
+                "lte_band_mask": band_mask,
+                "is_gw_band": "0",
+                "gw_band_mask": "0",
+            },
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_nr_band_lock(self, nr_type: str, bands: str) -> Dict[str, Any]:
+        """nr_type: 'nsa' or 'sa'. bands: comma-separated band numbers, e.g. '78,3,1'."""
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zte_nwinfo_api",
+            "nwinfo_set_nrbandlock",
+            {"nr5g_type": nr_type, "nr5g_band": bands},
+            token,
+        )
+        return self._safe_result(response)
+
+    def reset_band_cell_locks(self) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zte_nwinfo_api",
+            "nwinfo_reset_band_cell_setting",
+            {},
+            token,
+        )
+        return self._safe_result(response)
+
+    def send_ussd(self, code: str) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_ussd",
+            "libzte_ussd_web_process",
+            {"ussd_data": code},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_firewall(self, enable: bool) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_firewall_switch",
+            {"enable": 1 if enable else 0},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_nat(self, enable: bool) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_nat_switch",
+            {"enable": 1 if enable else 0},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_upnp(self, enable: bool) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_upnp_switch",
+            {"enable_upnp": 1 if enable else 0},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_dmz(self, enable: bool, dmz_ip: str = "") -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_dmz",
+            {"dmz_enable": 1 if enable else 0, "dmz_ip": dmz_ip},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_wan_dns(self, mode: str, prefer_dns: str = "", standby_dns: str = "") -> Dict[str, Any]:
+        """mode: 'auto' or 'manual'."""
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_wan_dns",
+            {
+                "dns_mode": mode,
+                "prefer_dns_manual": prefer_dns,
+                "standby_dns_manual": standby_dns,
+            },
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_wan_mtu(self, mtu: int) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_wan_mtu",
+            {"mtu": mtu},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_ddns(
+        self,
+        enable: bool,
+        service: str = "",
+        domain: str = "",
+        account: str = "",
+        password: str = "",
+    ) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_router.api",
+            "router_set_ddns",
+            {
+                "enable": 1 if enable else 0,
+                "service": service,
+                "domain": domain,
+                # Upstream ubus method itself uses this misspelled key name.
+                "accout": account,
+                "password": password,
+            },
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_apn_mode(self, mode: str) -> Dict[str, Any]:
+        """mode: '0' (auto) or '1' (manual)."""
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_apn_object",
+            "set_apn_mode",
+            {"apn_mode": mode},
+            token,
+        )
+        return self._safe_result(response)
+
+    def add_apn_profile(
+        self,
+        profile_name: str,
+        apn: str,
+        username: str = "",
+        password: str = "",
+        pdp_type: int = 0,
+        auth_mode: int = 0,
+    ) -> Dict[str, Any]:
+        """pdp_type: 0=IPv4, 1=IPv6, 2=both. auth_mode: 0=none, 1=PAP, 2=CHAP."""
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_apn_object",
+            "add_manu_apn",
+            {
+                "profilename": profile_name,
+                "wanapn": apn,
+                "username": username,
+                "password": password,
+                "pdpType": pdp_type,
+                "pppAuthMode": auth_mode,
+            },
+            token,
+        )
+        return self._safe_result(response)
+
+    def _get_uci_config(self, config_name: str) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call("uci", "get", {"config": config_name}, token)
+        result = self._safe_result(response)
+        return result if isinstance(result, dict) else {}
+
+    def get_upnp_status(self) -> Dict[str, Any]:
+        """Read UPnP status. No vendor 'get' API exists for this; read from
+        the underlying UCI config instead (uci.get config=upnpd)."""
+        values = self._get_uci_config("upnpd").get("values") or {}
+        config = values.get("config") if isinstance(values, dict) else None
+        config = config if isinstance(config, dict) else {}
+        return {"enabled": config.get("enable_upnp") == "1"}
+
+    def _get_firewall_uci(self) -> Dict[str, Any]:
+        values = self._get_uci_config("firewall").get("values")
+        return values if isinstance(values, dict) else {}
+
+    def get_dmz_status(self) -> Dict[str, Any]:
+        """Read DMZ status. No vendor 'get' API exists; DMZ shows up as a
+        firewall redirect rule named "DMZ" in the UCI firewall config."""
+        for section in self._get_firewall_uci().values():
+            if isinstance(section, dict) and section.get(".type") == "redirect" and section.get("name") == "DMZ":
+                return {"enabled": section.get("enabled") == "1", "dest_ip": section.get("dest_ip", "")}
+        return {"enabled": False, "dest_ip": ""}
+
+    def get_nat_status(self) -> Dict[str, Any]:
+        """Read NAT status via the WAN zone's masquerade flag. No vendor
+        'get' API exists for this. Not fully confirmed to correspond to
+        what router_set_nat_switch actually toggles -- best effort."""
+        for section in self._get_firewall_uci().values():
+            if isinstance(section, dict) and section.get(".type") == "zone" and section.get("name") == "wan":
+                return {"enabled": section.get("masq") == "1"}
+        return {"enabled": False}
+
+    def get_ddns_status(self) -> Dict[str, Any]:
+        """Read DDNS status. Unlike the others, a real vendor 'get' method
+        exists for this (router_get_ddns). Note: it never returns the
+        configured password, so this must stay read-only/informational."""
+        token = self._ensure_token()
+        response = self._ubus_call("zwrt_router.api", "router_get_ddns", {}, token)
+        result = self._safe_result(response)
+        return result if isinstance(result, dict) else {}
+
+    def get_odu_led_status(self) -> Dict[str, Any]:
+        """Read ODU (external unit) LED status. Real vendor 'get' method."""
+        token = self._ensure_token()
+        response = self._ubus_call("zwrt_led", "get_ODU_switch_state", {}, token)
+        result = self._safe_result(response)
+        return result if isinstance(result, dict) else {}
+
+    def set_odu_led(self, enable: bool) -> Dict[str, Any]:
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_led",
+            "set_ODU_switch_state",
+            {"switch": "1" if enable else "0", "offtime": "15"},
+            token,
+        )
+        return self._safe_result(response)
+
+    def set_wifi_band(self, band: str, enable: bool) -> Dict[str, Any]:
+        """band: '2g' or '5g'. Toggles only that radio, leaving the other alone."""
+        section = "main_2g" if band == "2g" else "main_5g"
+        token = self._ensure_token()
+        response = self._ubus_call(
+            "zwrt_wlan",
+            "set",
+            {section: {"disabled": "0" if enable else "1"}},
             token,
         )
         return self._safe_result(response)

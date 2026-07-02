@@ -87,6 +87,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         ConnectionUptimeSensor(coordinator),
     ])
     handled_keys.update(["station_list", "lan_station_list", "all_devices"])
+    if router_type == ROUTER_TYPE_G5_ULTRA:
+        # These keys already back a dedicated switch entity (switch.py); skip
+        # them here so the generic sensor loop below doesn't create a
+        # redundant duplicate sensor for the same underlying state.
+        handled_keys.update(
+            [
+                "wifi_onoff", "mobile_data_enable", "upnp_enabled", "dmz_enabled", "dmz_ip", "nat_enabled",
+                "wifi_2g_enabled", "wifi_5g_enabled", "lock_lte_cell", "lock_nr_cell",
+            ]
+        )
 
     # Create and store the SMS coordinator (if not already created)
     sms_coordinator = ZTERouterSMSUpdateCoordinator(hass, ip, pwd, user, router_type, sms_check_interval)
@@ -176,11 +186,14 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
                 for cmd, label in keys.items():
                     cmd_str = str(cmd)
                     cmd_data = parsed.get(cmd_str, {})
-                    if isinstance(cmd_data, dict):
+                    if isinstance(cmd_data, dict) and "error" not in cmd_data:
                         new_data[label] = cmd_data
                         new_data.update(cmd_data)
                     else:
-                        _LOGGER.warning(f"Unexpected cmd_data format for command {cmd}: {cmd_data}")
+                        _LOGGER.warning(
+                            f"[ZTE] Command {cmd} ({label}) failed or returned no data this cycle, "
+                            f"keeping previous values for its fields: {cmd_data}"
+                        )
             else:
                 _LOGGER.warning("[ZTE] Empty overall response, no data parsed.")
         except Exception as e:
@@ -192,7 +205,10 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
         if not new_data and not self.allow_stale_data:
             raise UpdateFailed("[ZTE] No valid data obtained from router.")
 
-        self._data = new_data or self._data  # Retain old data if new data is empty
+        # Merge onto the existing data instead of replacing it wholesale, so a single
+        # sub-command failing on one poll (e.g. a transient ubus error) doesn't wipe
+        # out unrelated, still-valid fields from the last successful poll.
+        self._data = {**self._data, **new_data} if new_data else self._data
         return self._data
 
 
@@ -311,6 +327,18 @@ class ZTERouterEntity(RestoreEntity, Entity):
         # Only return attributes if self._attributes is defined
         return getattr(self, "_attributes", {})
 
+# Long delimited-list fields: (separator, unit label for the summarized state).
+# The full value is preserved in the "raw_value" attribute.
+LIST_SUMMARY_KEYS = {
+    "lte_band": (",", "bands"),
+    "nr5g_nsa_band_lock": (",", "bands"),
+    "nr5g_sa_band_lock": (",", "bands"),
+    "lteca": (";", "carriers"),
+    "ltecasig": (";", "readings"),
+    "nr_neighbor_cell": (";", "neighbors"),
+    "lte_neighbor_cell": (";", "neighbors"),
+}
+
 class ZTERouterSensor(ZTERouterEntity):
     def __init__(self, coordinator, name, key, disabled_by_default=False):
         self.coordinator = coordinator
@@ -401,6 +429,17 @@ class ZTERouterSensor(ZTERouterEntity):
                         _LOGGER.debug(
                             f"Truncated 'ngbr_cell_info' to {max_length} characters for key '{self._key}'."
                         )
+
+                elif self._key in LIST_SUMMARY_KEYS and new_state.strip():
+                    # Long delimited lists (band masks, carrier-aggregation legs,
+                    # neighbor cells) look ugly as a raw state string on the
+                    # device page. Show a short count instead; the full value
+                    # is still available as the "raw_value" attribute.
+                    separator, unit = LIST_SUMMARY_KEYS[self._key]
+                    items = [item for item in new_state.split(separator) if item.strip()]
+                    raw_state = f"{len(items)} {unit}"
+                    display_state = raw_state
+                    self._attributes = {"raw_value": new_state}
 
                 # Compare raw values to detect change
                 if raw_state != old_state:
@@ -1373,6 +1412,14 @@ THROUGHPUT_KEYS = {
     "flux_realtime_rx_thrpt",
 }
 
+# Fields that hold a descriptive string (e.g. "GB") rather than a number.
+# G5 Ultra's ubus backend already resolves these to text; treating them as
+# numeric like the rest of the FLUX fields crashes the float() conversion.
+TEXT_KEYS = {
+    "flux_data_volume_limit_unit",
+    "data_volume_limit_unit",
+}
+
 class ZTEDataStatisticsSensor(ZTERouterEntity):
     def __init__(self, coordinator, key):
         self.coordinator = coordinator
@@ -1397,6 +1444,9 @@ class ZTEDataStatisticsSensor(ZTERouterEntity):
         if raw in [None, "", "null"]:
             _LOGGER.warning(f"[FLUX] {self._name}: Missing or empty value")
             return None if not self.coordinator.allow_stale_data else "N/A"
+
+        if self._key in TEXT_KEYS:
+            return str(raw).strip()
 
         try:
             clean_raw = str(raw).strip()
@@ -1511,8 +1561,8 @@ class ZTEFluxTotalUsageSensor(ZTEFluxSensor):
             tx_raw = self._get_value("flux_monthly_tx_bytes")
             rx_raw = self._get_value("flux_monthly_rx_bytes")
 
-            tx = int(float(tx_raw.strip())) if tx_raw else 0
-            rx = int(float(rx_raw.strip())) if rx_raw else 0
+            tx = int(float(str(tx_raw).strip())) if tx_raw else 0
+            rx = int(float(str(rx_raw).strip())) if rx_raw else 0
 
             total_gb = (tx + rx) / 1024 / 1024 / 1024
             return round(total_gb, 2)

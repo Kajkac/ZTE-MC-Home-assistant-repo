@@ -1,127 +1,169 @@
-# ZTE Router Integration for Home Assistant
+<div align="center">
+
+# 🛰️ ZTE Router Integration for Home Assistant
+
+**Sensors, diagnostics, and control for ZTE 5G routers — SMS, device tracking, data usage, and more.**
 
 [![GitHub release](https://img.shields.io/github/release/Kajkac/ZTE-MC-Home-assistant-repo.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/)
 [![HACS Default](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
-[![HACS Beta](https://img.shields.io/badge/HACS-Beta-blue.svg)](https://hacs.xyz/)
-![GitHub License](https://img.shields.io/github/license/Kajkac/ZTE-MC-Home-assistant-repo)
-![GitHub Stars](https://img.shields.io/github/stars/Kajkac/ZTE-MC-Home-assistant-repo)
+[![License](https://img.shields.io/github/license/Kajkac/ZTE-MC-Home-assistant-repo)](LICENSE)
+[![Installs](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=active%20installs&suffix=%20&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.zte_router.total)](https://analytics.home-assistant.io/custom_integrations.json)
 
-![Validate with Hassfest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/hassfest.yml/badge.svg)
-![Validate with HACS](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/validate.yml/badge.svg)
-![CodeQL](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/codeql.yml/badge.svg)
-![Main Build](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/main.yml/badge.svg)
+[Install via HACS](#-installation) · [Supported devices](#-supported-devices) · [Beta versions](#-beta-versions) · [Services](#-services) · [Known issues](#-known-issues)
 
-![Contributors](https://img.shields.io/github/contributors/Kajkac/ZTE-MC-Home-assistant-repo)
-![Maintenance](https://img.shields.io/maintenance/yes/2025)
-![Last Commit](https://img.shields.io/github/last-commit/Kajkac/ZTE-MC-Home-assistant-repo)
-![Commit Activity](https://img.shields.io/github/commit-activity/y/Kajkac/ZTE-MC-Home-assistant-repo)
-![Installation Count](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.zte_router.total)
+</div>
 
-# ZTE Router Integration for Home Assistant
-Component to integrate some ZTE routers as a device tracker in Home Assistant. 
-This repository contains the ZTE Router custom integration and an add-on to deploy it in Home Assistant. The custom integration is located in the `custom_components/zte_router` directory.
+---
+
+> [!NOTE]
+> This integration is in **beta**. It's stable enough for daily use and actively maintained, but expect some rough edges — see [Known Issues](#-known-issues) below.
 
 ## 🚀 Overview
 
-This is a custom Home Assistant integration for several ZTE 5G routers. It adds full sensor tracking, diagnostics, and control over supported devices.
+A custom Home Assistant integration for ZTE 5G routers/CPEs — MC-series and G5-series. It polls your router locally (no cloud, no external services) for signal, connectivity, and SMS data, and exposes controls back to it.
 
-### ✅ Features
+### ✨ Features
 
-- Support for **MC801A, MC889, MC888, MC889A, MC888A**, and similar models with or without username
-- Automatically discovers devices and sensors
-- Wi-Fi and LAN client tracking
-- FLUX usage monitoring (TX/RX rates, data limit, usage alerts) - for newer versions of routers
-- SMS inbox access and diagnostics + sending predefined sms
-- Auto-config flow setup
-- Multiple sensor categories and diagnostic grouping
+- 📶 Signal, connectivity, and diagnostic sensors — auto-discovered per model
+- 📱 Wi-Fi and LAN client tracking (device tracker)
+- 📊 FLUX usage monitoring — TX/RX rates, data plan limits, usage alerts (newer firmware)
+- 💬 SMS inbox access, diagnostics, and sending (predefined or custom, via service)
+- 🖱️ Buttons and switches for reboot, Wi-Fi toggle, SMS actions, and more
+- ⚙️ Guided config flow — pick your model, enter IP/password, done
+- 🧩 Works with or without a router username, depending on model
 
-> **Note:** This integration is in **beta**. It is stable enough for testing and general use, but expect some features to evolve.
+## 📋 Supported Devices
 
-## Installation
-### Manual Installation
+| Model family | Config flow selection | Username required? |
+| --- | :---: | :---: |
+| ZTE MC801 / **MC801A** | `MC801` | No |
+| ZTE MC888 / **MC888A** | `MC888` | Yes |
+| ZTE MC889 / **MC889A** | `MC889` | Yes |
+| ZTE **G5 Ultra** and related G5-series units (e.g. MC8512, MC8830 profile) | `G5 Ultra` | No |
 
-1. Download the latest [zte-router](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/latest/download/zte_router.zip) release
-2. Place the files of the .zip in your **root directory of Home Assistant** (That should only effectively place files into `/custom_components/zte_router`)
+Similar/rebadged variants of these chassis families are generally expected to work. If your model isn't listed and something doesn't work, please [open an issue](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/issues) with your firmware version.
+
+## 📦 Installation
+
+### Via HACS (recommended)
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Kajkac&repository=ZTE-MC-Home-assistant-repo&category=integration)
+
+<details>
+<summary>Manual HACS steps</summary>
+
+1. `HACS` → `Integrations` → `⋮` → `Custom Repositories`
+2. **Repository:** paste this repo's URL
+3. **Category:** Integration
+4. Click `Add`, close the dialog
+5. `+ EXPLORE & DOWNLOAD REPOSITORIES` → search `ZTE router` → `Download`
+6. Restart Home Assistant
+7. Add the integration:
+
+   [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zte_router)
+
+8. Select your model, enter the router's IP and password, and wait for setup to finish.
+
+</details>
+
+### Manual install
+
+<details>
+<summary>Steps</summary>
+
+1. Download the latest [`zte_router.zip`](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/releases/latest/download/zte_router.zip)
+2. Extract it into your Home Assistant config root (it should land in `/config/custom_components/zte_router`)
 3. Restart Home Assistant
-4. Go to `Settings` > `Devices and Services` to search and add the ZTE Router integration
-5. Select the model you have and enter the Router IP, password and wait for the integration to install all the device sensors.
+4. `Settings` → `Devices & Services` → add **ZTE Router**
+5. Select your model, enter the router's IP and password, and wait for setup to finish
 
-### Installation with HACS
+</details>
 
-**Method 1**
+![Screenshot](https://raw.githubusercontent.com/Kajkac/ZTE-MC-Home-assistant-repo/main/zte.png)
 
-[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Kajkac&repository=ZTE-MC-Home-assistant-repo&category=integration) 
+## 🧪 Beta Versions
 
-**Method 2**
-1. `HACS` > `Integrations` > `⋮` > `Custom Repositories`
-2. `Repository`: paste the URL of this repo
-3. `Category`: Integration
-4. Click `Add`
-5. Close `Custom Repositories` modal
-6. Click `+ EXPLORE & DOWNLOAD REPOSITORIES`
-7. Search for `ZTE router`
-8. Click `Download`
-9. Restart Home Assistant
-10. Search for "integration" in the ZTE Router integration and add it to Home Assistant or click on this link:
+New features land in **beta releases first** — versions tagged like `1.0.56b1`, `1.0.56b2`, etc. — before being promoted to a stable release. This is where things like new sensors, switches, or services get real-world testing before everyone gets them by default.
 
-[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zte_router)
+> [!IMPORTANT]
+> Beta versions are for **testing, not production**. They may contain bugs, incomplete features, or ubus/API calls that haven't been verified across all router models yet. Don't rely on a beta build for anything critical (e.g. don't test firewall/NAT changes on a router you can't physically access if something goes wrong).
 
-11. Select the model and enter the router's IP and password.
-12. Wait for the integration to install all the device sensors.
+**What's typically still in beta:**
 
-## 🧪 Beta Features
+- Newly-added G5 Ultra controls (band/cell locking, network mode, USSD, router-level settings like firewall/NAT/UPnP/DMZ/DNS/DDNS/APN) — these were reverse-engineered from ubus calls and validated on specific hardware, but may behave differently on other G5-series firmware
+- Anything explicitly marked `(beta)` in its service/entity name or description
 
-To install beta versions from HACS:
+**How to opt in:**
 
-1. In HACS → Integrations → ZTE Router → `⋮` → Redownload
-2. Toggle **"Show beta versions"** or Need a different version
-3. Select the latest `-b1` or `-beta.x` version
-4. Restart Home Assistant
+<details>
+<summary>Install a beta build from HACS</summary>
 
+1. `HACS` → `Integrations` → `ZTE Router` → `⋮` → `Redownload`
+2. Toggle **"Show beta versions"** and pick the latest `bN` build
+3. Restart Home Assistant
 
-![SCreenshot](https://raw.githubusercontent.com/Kajkac/ZTE-MC-Home-assistant-repo/main/zte.png)
+</details>
 
-## 📡 Services
+Found something broken in a beta? [Open an issue](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/issues) with your router model, firmware version, and what you tried — that's exactly what the beta cycle is for.
+
+## 🔧 Services
 
 ### `zte_router.send_custom_sms`
 
-Send an SMS with any phone number and message, independent of the phone numbers configured during setup. Useful for calling from your own automations/scripts.
+Send an SMS to any phone number with any message, independent of the phone numbers configured during setup — useful from your own automations/scripts.
 
-**Fields:**
-- `message` (required) — the text to send.
-- `phone_number` or `phone` (required, provide either one) — destination number.
-- `entry_id` (optional) — only needed if you have more than one ZTE Router entry configured; omit it if you only have one.
-
-Example, in an automation action or a script:
+| Field | Required | Description |
+| --- | :---: | --- |
+| `message` | ✅ | Text to send |
+| `phone_number` / `phone` | ✅ (one of) | Destination number |
+| `entry_id` | — | Only needed with multiple ZTE Router entries |
 
 ```yaml
 action: zte_router.send_custom_sms
 data:
-  phone_number: "0989072702"
+  phone_number: "+15555550100"
   message: "Garage door left open for 10 minutes"
 ```
 
-Or from Developer Tools → Actions, call `zte_router.send_custom_sms` with the same fields.
-
-This works on all supported router types (MC801, MC888, MC889, G5 Ultra) and reuses the same underlying send-SMS command as the built-in "Send SMS" buttons — it does not affect or replace your configured automations, it's just another way to trigger an SMS with content you choose at call time.
+Works on every supported model (MC801, MC888, MC889, G5 Ultra) — it reuses the same underlying send-SMS command as the built-in "Send SMS" buttons, so it's purely additive and doesn't touch your existing automations.
 
 ### `zte_router.ubus_call`
 
-Advanced/debug service for G5 Ultra routers only — invokes an arbitrary ubus module/method directly (e.g. for exploring endpoints not yet exposed as sensors). Fields: `module`, `method`, optional `params` (JSON object) and `entry_id`. Not needed for normal use.
+Advanced/debug service, **G5 Ultra only** — invokes an arbitrary ubus module/method directly, for exploring endpoints not yet exposed as sensors.
+
+| Field | Required | Description |
+| --- | :---: | --- |
+| `module` | ✅ | ubus object name |
+| `method` | ✅ | Method to call |
+| `params` | — | JSON object of call parameters |
+| `entry_id` | — | Only needed with multiple entries |
+
+Not needed for normal use.
 
 ## 🐞 Known Issues
 
-- Some sensors may occasionally show `unknown` until refreshed
-- SMS parsing may behave differently between router models
-- Occasional log errors (under investigation)
-- Errors in Home Assistant log - They are for now present until I polish the addon
-- Various errors in sensors etc. - This integration is classified as beta right now but can be tested by anyone. 
-- For suggestions, please open a new issue
-- I will push new builds as soon I will have more time. Make sure you "star" this integration. 
+- Some sensors may briefly show `unknown` until the next refresh
+- SMS parsing can behave differently across router models/firmware
+- A few log warnings are still being cleaned up — the integration is fully usable, but not yet fully quiet in the logs
+- Found something else? [Open an issue](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/issues) — reports drive what gets fixed next
 
-## Contributors
-If u have any suggestion, or you are doing pull requests and adding new features, increment the version number by 1 in manifest.json, so that GitHub automation automatically creates a new release.
+## 🤝 Contributing
 
-🙏 Special Thanks
+Pull requests welcome. If you're adding a feature or fix, bump the version in `manifest.json` — merges to `main` automatically cut a GitHub release for that version.
 
-Huge thanks to @rosenrot00 for helping rewrite major portions of the code and improving overall quality!
+[![Hassfest](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/hassfest.yml/badge.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/hassfest.yml)
+[![HACS Validation](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/validate.yml/badge.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/validate.yml)
+[![CodeQL](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/codeql.yml/badge.svg)](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/actions/workflows/codeql.yml)
+![Last Commit](https://img.shields.io/github/last-commit/Kajkac/ZTE-MC-Home-assistant-repo)
+
+### 🙏 Thanks
+
+Huge thanks to **[@rosenrot00](https://github.com/rosenrot00)** for helping rewrite major portions of the code and improving overall quality.
+
+---
+
+<div align="center">
+
+If this integration is useful to you, consider ⭐ starring the repo — it helps others find it.
+
+</div>
