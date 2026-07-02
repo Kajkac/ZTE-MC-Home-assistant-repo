@@ -1,15 +1,9 @@
-import json
-import time
 import logging
-import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from homeassistant.helpers.entity_registry import async_get
-from homeassistant.helpers.entity import Entity, EntityCategory
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import PlatformNotReady
 from .const import (
     DOMAIN,
     SENSOR_NAMES,
@@ -22,34 +16,37 @@ from .const import (
     DISABLED_SENSORS_G5_ULTRA,
     DIAGNOSTICS_SENSORS,
     FLUX_KEYS,
-    FLUX_ICON_MAP,
-    CONF_ALLOW_STALE_DATA,
-    DEFAULT_ALLOW_STALE_DATA,
     ROUTER_TYPE_MC801,
     ROUTER_TYPE_MC888,
     ROUTER_TYPE_MC889,
     ROUTER_TYPE_G5_ULTRA,
 )
-from .router_backend import run_router_commands
+from .sensor_base import ZTERouterEntity, guard_stale_data
+from .sensor_bands import ConnectedBandsSensor
+from .sensor_flux import ZTEFluxSensor, ZTEFluxTotalUsageSensor
+from .coordinators import (
+    ZTERouterDataUpdateCoordinator,
+    ZTERouterSMSUpdateCoordinator,
+    extract_json,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
-def guard_stale_data(update_func):
-    async def wrapper(self, *args, **kwargs):
-        if not self.coordinator.last_update_success and not self.coordinator.allow_stale_data:
-            _LOGGER.warning(f"{self._name}: Clearing state due to failed update and stale data disabled.")
-            self._state = None
-            if hasattr(self, '_attributes'):
-                self._attributes.clear()
-            self.async_write_ha_state()
-            return
-        await update_func(self, *args, **kwargs)
-        self.async_write_ha_state()  # <-- ensure state always updates after success
-    return wrapper
+# Re-exported for backwards compatibility -- these used to live in this file
+# and other modules (or third-party tooling) may still import them from here.
+__all__ = [
+    "ZTERouterDataUpdateCoordinator",
+    "ZTERouterSMSUpdateCoordinator",
+    "extract_json",
+    "ConnectedBandsSensor",
+    "ZTEFluxSensor",
+    "ZTEFluxTotalUsageSensor",
+]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     _LOGGER.info("Setting up ZTE Router integration")
-    
+
     # Hole die existierenden Coordinators aus hass.data
     coordinators = hass.data[DOMAIN][entry.entry_id]
     coordinator = coordinators["coordinator"]
@@ -107,7 +104,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     sms_data = sms_coordinator.data.get("sms_data", {}) or {}
     sensors.append(LastSMSSensor(sms_coordinator, sms_data, disabled_sensors.get("last_sms", False)))
 
-
     # FLUX Sensors (bleibt wie bisher)
     registry = async_get(hass)
     if enable_flux:
@@ -152,181 +148,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     async_add_entities(sensors, False)
 
 
-def extract_json(output):
-    try:
-        return output[output.index('{'):output.rindex('}')+1]
-    except ValueError:
-        return "{}"
-
-class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass, ip, pwd, user, router_type, interval, allow_stale_data=True):
-        self.ip_entry = ip
-        self.password_entry = pwd
-        self.username_entry = user
-        self.router_type = router_type
-        self.config_entry = None
-        self._data = {}
-        self.allow_stale_data = allow_stale_data
-        _LOGGER.info(f"Initializing ZTERouterDataUpdateCoordinator with Ping check interval: {interval} seconds")
-        super().__init__(
-            hass, _LOGGER, name="zte_router", update_interval=timedelta(seconds=interval)
-        )
-
-    async def _async_update_data(self):
-        _LOGGER.info("Starting _async_update_data in ZTERouterDataUpdateCoordinator at %s", datetime.now())
-        new_data = {}
-        keys = {3: "dynamic_data", 7: "status_data", 16: "client_data"}
-        cmds = ','.join(map(str, keys.keys()))
-
-        try:
-            raw = await self.hass.async_add_executor_job(self.run_router_script, cmds)
-            parsed = json.loads(extract_json(raw))
-            #_LOGGER.warning(f"_____DATA {parsed}")
-            if parsed:
-                for cmd, label in keys.items():
-                    cmd_str = str(cmd)
-                    cmd_data = parsed.get(cmd_str, {})
-                    if isinstance(cmd_data, dict) and "error" not in cmd_data:
-                        new_data[label] = cmd_data
-                        new_data.update(cmd_data)
-                    else:
-                        _LOGGER.warning(
-                            f"[ZTE] Command {cmd} ({label}) failed or returned no data this cycle, "
-                            f"keeping previous values for its fields: {cmd_data}"
-                        )
-            else:
-                _LOGGER.warning("[ZTE] Empty overall response, no data parsed.")
-        except Exception as e:
-            _LOGGER.error(f"[ZTE] Failed to fetch data: {e}")
-            if not self.allow_stale_data:
-                raise UpdateFailed(f"[ZTE] Critical failure fetching data: {e}")
-            _LOGGER.warning(f"[ZTE] Allowing stale data due to error: {e}")
-
-        if not new_data and not self.allow_stale_data:
-            raise UpdateFailed("[ZTE] No valid data obtained from router.")
-
-        # Merge onto the existing data instead of replacing it wholesale, so a single
-        # sub-command failing on one poll (e.g. a transient ubus error) doesn't wipe
-        # out unrelated, still-valid fields from the last successful poll.
-        self._data = {**self._data, **new_data} if new_data else self._data
-        return self._data
-
-
-    def run_router_script(self, cmd):
-        attempt = 0
-        retries = 3
-        delay = 2
-        while attempt < retries:
-            try:
-                return run_router_commands(
-                    self.router_type,
-                    self.ip_entry,
-                    self.password_entry,
-                    self.username_entry,
-                    str(cmd),
-                )
-            except Exception as err:
-                attempt += 1
-                if attempt < retries:
-                    time.sleep(delay)
-                    delay *= 2
-                else:
-                    raise err
-
-class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass, ip, password_entry, username_entry, router_type, sms_check_interval):
-        self.ip_entry = ip
-        self.password_entry = password_entry
-        self.username_entry = username_entry if username_entry else ""
-        self.router_type = router_type
-        self._data = {}
-        _LOGGER.info(f"Initializing SMSUpdateCoordinator with SMS check interval: {sms_check_interval} seconds")
-        super().__init__(
-            hass,
-            _LOGGER,
-            name="zte_router_sms",
-            update_interval=timedelta(seconds=sms_check_interval),  # Use sms_check_interval
-        )
-
-    async def _async_update_data(self):
-        _LOGGER.info("Starting _async_update_data in ZTERouterSMSUpdateCoordinator at %s", datetime.now())
-        new_data = {}
-        keys = {6: "sms_data"}
-        cmds = ','.join(map(str, keys.keys()))
-
-        try:
-            raw = await self.hass.async_add_executor_job(self.run_router_script, cmds)
-            parsed = json.loads(extract_json(raw))
-            _LOGGER.debug(f"SMS parsed data: {parsed}")
-            if parsed:
-                for cmd, label in keys.items():
-                    cmd_str = str(cmd)
-                    cmd_data = parsed.get(cmd_str, {})
-                    if isinstance(cmd_data, dict):
-                        new_data[label] = cmd_data
-                        new_data.update(cmd_data)
-                    else:
-                        _LOGGER.warning(f"Unexpected cmd_data format for command {cmd}: {cmd_data}")
-
-                self._data.update(new_data)
-            else:
-                _LOGGER.warning("SMS coordinator received empty data.")
-
-        except Exception as err:
-            _LOGGER.error(f"Error during _async_update_data (SMS): {err}")
-
-        return self._data
-
-    def run_router_script(self, command):
-        try:
-            return run_router_commands(
-                self.router_type,
-                self.ip_entry,
-                self.password_entry,
-                self.username_entry,
-                str(command),
-            )
-        except Exception as err:
-            _LOGGER.error(f"Error running SMS command {command}: {err}")
-            raise
-
-class ZTERouterEntity(RestoreEntity, Entity):
-    """Base class for ZTE Router sensors to ensure consistent MRO."""
-
-    async def async_added_to_hass(self):
-        _LOGGER.info(f"Entity {self.name} added to hass at {datetime.now()}")
-        await super().async_added_to_hass()
-        last_state = await self.async_get_last_state()
-        if last_state is not None:
-            self._state = last_state.state
-            if hasattr(self, "_attributes"):
-                self._attributes.update(last_state.attributes)
-            _LOGGER.debug(f"Restored state for {self.name}: {self._state}")
-        self.async_on_remove(self.coordinator.async_add_listener(
-            lambda: asyncio.ensure_future(self.async_handle_coordinator_update())
-        ))
-        await self.async_handle_coordinator_update()
-
-    def _get_value(self, key):
-        """Strict fetch that respects allow_stale_data."""
-        if not self.coordinator.last_update_success and not self.coordinator.allow_stale_data:
-            _LOGGER.debug(f"[STRICT MODE] {self.name}: blocked access to stale key '{key}'")
-            return None
-        return self.coordinator.data.get(key)
-
-    @property
-    def is_diagnostics(self) -> bool:
-        return getattr(self, "_attr_is_diagnostics", False)
-
-    @property
-    def entity_category(self):
-        return EntityCategory.DIAGNOSTIC if self.is_diagnostics else None
-
-    @property
-    def extra_state_attributes(self):
-        # Only return attributes if self._attributes is defined
-        return getattr(self, "_attributes", {})
-
 # Long delimited-list fields: (separator, unit label for the summarized state).
 # The full value is preserved in the "raw_value" attribute.
 LIST_SUMMARY_KEYS = {
@@ -338,6 +159,7 @@ LIST_SUMMARY_KEYS = {
     "nr_neighbor_cell": (";", "neighbors"),
     "lte_neighbor_cell": (";", "neighbors"),
 }
+
 
 class ZTERouterSensor(ZTERouterEntity):
     def __init__(self, coordinator, name, key, disabled_by_default=False):
@@ -496,7 +318,6 @@ class LastSMSSensor(ZTERouterEntity):
         self._attr_should_poll = False  # Disable default polling
         _LOGGER.info(f"Initializing Last SMS sensor with state: {self._state} (SMS ID)")
 
-
         # Parse and format the date attribute
         if "date" in self._attributes:
             self._attributes["formatted_date"] = self.format_date(self._attributes["date"])
@@ -603,193 +424,6 @@ class LastSMSSensor(ZTERouterEntity):
             else:
                 candidate = "NO DATA"
         return str(candidate)
-#fixed indent outside of a class
-def format_ca_bands(ca_bands, nr5g_action_band):
-    _LOGGER.debug(f"Raw ca_bands input: {ca_bands}")
-    _LOGGER.debug(f"Raw nr5g_action_band input: {nr5g_action_band}")
-
-    if not ca_bands:
-        _LOGGER.debug("No CA bands provided. Returning 'No CA'")
-        return "No CA"
-
-    ca_bands_formatted = []
-
-    for band in ca_bands.strip(';').split(';'):
-        if not band:
-            continue  # Skip empty strings after split
-
-        band_info = band.split(',')
-        _LOGGER.debug(f"Parsing CA band string: {band} -> split: {band_info}")
-
-        try:
-            if len(band_info) >= 6:
-                band_id = band_info[3]
-                bandwidth = band_info[5]
-            elif len(band_info) >= 5:
-                band_id = band_info[0]
-                bandwidth = band_info[4]
-            else:
-                _LOGGER.warning(f"Band info has insufficient parts: {band_info}")
-                continue
-
-            formatted_band = f"B{band_id}@{bandwidth}MHz"
-            ca_bands_formatted.append(formatted_band)
-            _LOGGER.debug(f"Formatted band: {formatted_band}")
-        except Exception as e:
-            _LOGGER.warning(f"Failed to format band '{band}' due to: {e}")
-
-    if nr5g_action_band:
-        ca_bands_formatted.append(nr5g_action_band)
-        _LOGGER.debug(f"Appended NR5G action band: {nr5g_action_band}")
-
-    formatted_result = "+".join(ca_bands_formatted)
-    _LOGGER.debug(f"Final formatted CA bands string: {formatted_result}")
-    return formatted_result
-
-
-def derive_primary_band_from_lteca(lteca: str):
-    if not lteca:
-        return None
-    chunks = [chunk for chunk in lteca.strip(";").split(";") if chunk]
-    if not chunks:
-        return None
-    first = chunks[0].split(",")
-    if len(first) >= 5:
-        return {
-            "band": first[0],
-            "bandwidth": first[4],
-        }
-    return None
-
-def calculate_enodeb_id(cell_id_value):
-    if not cell_id_value:
-        return ""
-    try:
-        if isinstance(cell_id_value, str):
-            stripped = cell_id_value.strip()
-            if not stripped:
-                return ""
-            lower = stripped.lower()
-            if lower.startswith("0x"):
-                numeric = int(lower, 16)
-            elif any(ch in lower for ch in "abcdef"):
-                numeric = int(lower, 16)
-            else:
-                numeric = int(lower, 10)
-        else:
-            numeric = int(cell_id_value)
-        return numeric // 256
-    except (ValueError, TypeError):
-        _LOGGER.debug("Unable to derive eNB ID from cell_id %s", cell_id_value)
-        return ""
-
-class ConnectedBandsSensor(ZTERouterEntity):
-    def __init__(self, coordinator, disabled_by_default=False):
-        self.coordinator = coordinator
-        self._name = "Connected Bands"
-        self._state = None
-        self._attributes = {}
-        self.entity_registry_enabled_default = not disabled_by_default
-        self._attr_is_diagnostics = True  # Ensure ConnectedBands is marked as diagnostics
-        self._attr_should_poll = False  # Disable default polling
-        _LOGGER.info(f"Initializing Connected Bands sensor")
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def state(self):
-        return self._state
-
-    @property
-    def unique_id(self):
-        return f"{DOMAIN}_{self.coordinator.ip_entry}_connected_bands"
-
-    @property
-    def device_info(self):
-        return {
-            "identifiers": {(DOMAIN, f"{DOMAIN}_{self.coordinator.ip_entry}")},
-            "name": self.coordinator.ip_entry,
-            "manufacturer": MANUFACTURER,
-            "model": MODEL,
-            "sw_version": self.coordinator.data.get("wa_inner_version", "Unknown")
-        }
-
-    @property
-    def available(self):
-        return self.coordinator.last_update_success or self.coordinator.allow_stale_data
-
-    @property
-    def extra_state_attributes(self):
-        return self._attributes
-
-    @property
-    def is_diagnostics(self):
-        return self._attr_is_diagnostics
-
-    @property
-    def entity_category(self):
-        if self.is_diagnostics:
-            return EntityCategory.DIAGNOSTIC
-        return None
-
-    async def async_update(self):
-        _LOGGER.info(f"Manual update requested for Connected Bands sensor at {datetime.now()}")
-        await self.coordinator.async_request_refresh()
-
-    @guard_stale_data
-    async def async_handle_coordinator_update(self):
-        old_state = self._state
-        if self.coordinator.data:
-            data = self.coordinator.data
-            rmcc = data.get("rmcc", "")
-            rmnc = data.get("rmnc", "")
-            cell_id_raw = data.get("cell_id", "")
-            cell_id = "" if cell_id_raw in (None, "") else str(cell_id_raw)
-            wan_ip = data.get("wan_ipaddr", "")
-            main_band = data.get("lte_ca_pcell_band", "")
-            main_bandwidth = data.get("lte_ca_pcell_bandwidth", "")
-            ca_bands = (
-                data.get("lte_multi_ca_scell_info")
-                or data.get("lte_multi_ca_scell_sig_info")
-                or ""
-            )
-            if not ca_bands and data.get("lteca"):
-                ca_bands = data.get("lteca")
-            ca_bands_formatted = format_ca_bands(ca_bands, data.get("nr5g_action_band", ""))
-
-            if getattr(self.coordinator, "router_type", None) == ROUTER_TYPE_G5_ULTRA:
-                lteca_block = data.get("lteca", "")
-                if (not main_band or not main_bandwidth) and lteca_block:
-                    primary = derive_primary_band_from_lteca(lteca_block)
-                    if primary:
-                        main_band = primary.get("band", main_band)
-                        main_bandwidth = primary.get("bandwidth", main_bandwidth)
-
-            # Calculate enbid
-            enb_id = calculate_enodeb_id(cell_id_raw if cell_id_raw not in ("", None) else cell_id)
-
-            if main_band and main_bandwidth:
-                self._state = f"MAIN:B{main_band}@{main_bandwidth}MHz CA:{ca_bands_formatted}"
-            else:
-                self._state = "No Bands Connected"
-
-            self._attributes = {
-                "rmcc": rmcc or "--",
-                "rmnc": rmnc or "--",
-                "cell_id": cell_id or "--",
-                "wan_ip": wan_ip or "--",
-                "main_band": main_band or "--",
-                "main_bandwidth": main_bandwidth or "--",
-                "ca_bands": ca_bands_formatted or "--",
-                "enb_id": enb_id or "--",
-            }
-            _LOGGER.info(f"Connected Bands sensor updated. Old state: {old_state}, New state: {self._state}")
-        else:
-            _LOGGER.warning("Connected Bands sensor: No valid data or update failed. Setting state to Unavailable")
-            self._state = None
-        self.async_write_ha_state()
 
 
 class MonthlyUsageSensor(ZTERouterEntity):
@@ -858,6 +492,7 @@ class MonthlyUsageSensor(ZTERouterEntity):
             self._state = None
         self.async_write_ha_state()
 
+
 #define GB TX sensor
 class monthly_tx_gb(ZTERouterEntity):
     def __init__(self, coordinator):
@@ -924,6 +559,7 @@ class monthly_tx_gb(ZTERouterEntity):
             self._state = None
         self.async_write_ha_state()
 
+
 #define GB RX sensor
 class monthly_rx_gb(ZTERouterEntity):
     def __init__(self, coordinator):
@@ -989,6 +625,7 @@ class monthly_rx_gb(ZTERouterEntity):
             _LOGGER.warning(f"Monthly RX GB sensor: No valid data or update failed. Setting state to Unavailable")
             self._state = None
         self.async_write_ha_state()
+
 
 #define DataLeftSensor
 class DataLeftSensor(ZTERouterEntity):
@@ -1071,7 +708,7 @@ class DataLeftSensor(ZTERouterEntity):
         except Exception as e:
             _LOGGER.warning(f"Failed to calculate Data Left: {e}")
             self._state = None
-        
+
         self._attributes = {
             "usage_source": "FLUX" if use_flux else "NATIVE",
             "used_gb": round(usage_gb, 2),
@@ -1144,6 +781,7 @@ class ConnectionUptimeSensor(ZTERouterEntity):
             _LOGGER.warning("Connection Uptime sensor: No valid data or update failed. Setting state to Unavailable")
             self._state = None
         self.async_write_ha_state()
+
 
 class ConnectedDevicesSensor(ZTERouterEntity):
     def __init__(self, coordinator, disabled_by_default=False):
@@ -1218,6 +856,7 @@ class ConnectedDevicesSensor(ZTERouterEntity):
         else:
             _LOGGER.warning("No data available for Connected Devices")
         self.async_write_ha_state()
+
 
 class WiFiClientsSensor(ZTERouterEntity):
     def __init__(self, coordinator, disabled_by_default=False):
@@ -1381,7 +1020,6 @@ class LANClientsSensor(ZTERouterEntity):
         self.async_write_ha_state()
 
 
-
 def format_seconds(seconds):
     try:
         seconds = int(seconds)
@@ -1399,178 +1037,3 @@ def format_seconds(seconds):
         return " ".join(parts)
     except (TypeError, ValueError):
         return "--"
-
-BYTE_KEYS = {
-    "flux_realtime_tx_bytes",
-    "flux_realtime_rx_bytes",
-    "flux_monthly_tx_bytes",
-    "flux_monthly_rx_bytes",
-}
-
-THROUGHPUT_KEYS = {
-    "flux_realtime_tx_thrpt",
-    "flux_realtime_rx_thrpt",
-}
-
-# Fields that hold a descriptive string (e.g. "GB") rather than a number.
-# G5 Ultra's ubus backend already resolves these to text; treating them as
-# numeric like the rest of the FLUX fields crashes the float() conversion.
-TEXT_KEYS = {
-    "flux_data_volume_limit_unit",
-    "data_volume_limit_unit",
-}
-
-class ZTEDataStatisticsSensor(ZTERouterEntity):
-    def __init__(self, coordinator, key):
-        self.coordinator = coordinator
-        self._key = key
-        self._name = SENSOR_NAMES.get(key, key)
-        self._unit = UNITS.get(key)
-        self._state = None
-        self.entity_registry_enabled_default = True
-        self._attr_should_poll = False
-        self._attr_is_diagnostics = key in FLUX_KEYS
-        _LOGGER.debug(f"[FLUX] Initialized ZTEDataStatisticsSensor: {self._name} | Diagnostic: {self._attr_is_diagnostics}")
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def state(self):
-        raw = self._get_value(self._key)
-        _LOGGER.debug(f"[FLUX] {self._name}: Raw value = {repr(raw)}")
-
-        if raw in [None, "", "null"]:
-            _LOGGER.warning(f"[FLUX] {self._name}: Missing or empty value")
-            return None if not self.coordinator.allow_stale_data else "N/A"
-
-        if self._key in TEXT_KEYS:
-            return str(raw).strip()
-
-        try:
-            clean_raw = str(raw).strip()
-            value = int(float(clean_raw))
-            _LOGGER.debug(f"[FLUX] {self._name}: Parsed value = {value}")
-
-            if self._key in BYTE_KEYS:
-                gb_value = value / 1024 / 1024 / 1024
-                self._unit = "GB"
-                if gb_value >= 1024:
-                    self._unit = "TB"
-                    result = round(gb_value / 1024, 2)
-                else:
-                    result = round(gb_value, 2)
-                return result
-
-            elif self._key.endswith("_time"):
-                return self.format_seconds(value)
-
-            elif self._key in THROUGHPUT_KEYS:
-                return self.format_throughput(value)
-
-            elif self._key == "date_month":
-                return f"{clean_raw[:4]}-{clean_raw[4:6]}" if len(clean_raw) == 8 else clean_raw
-
-            return value
-
-        except (ValueError, TypeError) as e:
-            _LOGGER.warning(f"[FLUX] {self._name}: Failed to convert value '{raw}' - {e}")
-            return None if not self.coordinator.allow_stale_data else "N/A"
-
-
-    @property
-    def unit_of_measurement(self):
-        if self._key in BYTE_KEYS:
-            return self._unit
-        elif self._key in THROUGHPUT_KEYS:
-            return None
-        return self._unit
-
-    @property
-    def unique_id(self):
-        return f"{DOMAIN}_{self.coordinator.ip_entry}_stat_{self._key}"
-
-    @property
-    def device_info(self):
-        return {
-            "identifiers": {(DOMAIN, f"{DOMAIN}_{self.coordinator.ip_entry}")},
-            "name": self.coordinator.ip_entry,
-            "manufacturer": "ZTE",
-            "model": "MC Series",
-        }
-
-    @property
-    def is_diagnostics(self):
-        return self._attr_is_diagnostics
-
-    @property
-    def entity_category(self):
-        return EntityCategory.DIAGNOSTIC if self.is_diagnostics else None
-
-    async def async_update(self):
-        _LOGGER.debug(f"[FLUX] Manual update requested for {self._name}")
-        await self.coordinator.async_request_refresh()
-
-    @guard_stale_data
-    async def async_handle_coordinator_update(self):
-        _LOGGER.debug(f"[FLUX] Coordinator update triggered for {self._name}")
-        self.async_write_ha_state()
-
-    def format_seconds(self, seconds):
-        hours = seconds // 3600
-        minutes = (seconds % 3600) // 60
-        sec = seconds % 60
-        return f"{hours}h {minutes}m {sec}s"
-
-    def format_throughput(self, bps):
-        if bps >= 1_000_000:
-            return f"{bps / 1_000_000:.2f} Mbps"
-        elif bps >= 1_000:
-            return f"{bps / 1_000:.2f} Kbps"
-        return f"{bps} bps"
-
-class ZTEFluxSensor(ZTEDataStatisticsSensor):
-    def __init__(self, coordinator, key):
-        super().__init__(coordinator, key)
-        self._attr_is_diagnostics = True
-        self._attr_should_poll = False
-        _LOGGER.debug(f"[FLUX] Initialized ZTEFluxSensor: {self._name}")
-
-    @property
-    def icon(self):
-        return FLUX_ICON_MAP.get(self._key, "mdi:chart-bar")
-
-    @property
-    def entity_category(self):
-        return EntityCategory.DIAGNOSTIC
-
-class ZTEFluxTotalUsageSensor(ZTEFluxSensor):
-    def __init__(self, coordinator):
-        super().__init__(coordinator, "flux_total_usage")
-        self._name = "FLUX Monthly Usage"
-        self._unit = "GB"
-        _LOGGER.debug(f"[FLUX] Initialized ZTEFluxTotalUsageSensor")
-
-    @property
-    def state(self):
-        if not self.coordinator.last_update_success and not self.coordinator.allow_stale_data:
-            _LOGGER.warning("[FLUX] Total Usage: Clearing state due to failed update and stale data disabled.")
-            return None
-        try:
-            tx_raw = self._get_value("flux_monthly_tx_bytes")
-            rx_raw = self._get_value("flux_monthly_rx_bytes")
-
-            tx = int(float(str(tx_raw).strip())) if tx_raw else 0
-            rx = int(float(str(rx_raw).strip())) if rx_raw else 0
-
-            total_gb = (tx + rx) / 1024 / 1024 / 1024
-            return round(total_gb, 2)
-
-        except Exception as e:
-            _LOGGER.warning(f"[FLUX] Total Usage calculation failed: {e}")
-            return None
-
-    @property
-    def unique_id(self):
-        return f"{DOMAIN}_{self.coordinator.ip_entry}_stat_flux_total_usage"

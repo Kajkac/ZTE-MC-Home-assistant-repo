@@ -8,6 +8,6 @@
   "integration_type": "hub",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/issues",
-  "requirements": ["aiohttp"],
-  "version": "1.0.56b7"
+  "requirements": ["aiohttp", "requests"],
+  "version": "1.0.56b8"
 }

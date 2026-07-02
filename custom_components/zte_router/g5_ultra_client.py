@@ -1,67 +1,23 @@
-import gzip
 import hashlib
 import json
 import logging
-import os
-import shutil
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 import requests
 import urllib3
-from logging.handlers import TimedRotatingFileHandler
 from requests.exceptions import RequestException
 
 ZERO_TOKEN = "0" * 32
 
+# Uses Home Assistant's standard logging (respects the level configured via
+# `logger:` in configuration.yaml, and HA's own home-assistant.log rotation).
+# Previously this module maintained its own separate DEBUG-forced log file
+# (ultra.log) written directly into the integration's own folder, which grew
+# to 100+ MB in normal use since it ignored HA's configured log level entirely.
 LOGGER = logging.getLogger("homeassistant.components.zte_router.g5_ultra")
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-LOG_FILE = os.path.join(os.path.dirname(__file__), "ultra.log")
-
-
-def _setup_file_logger():
-    if getattr(_setup_file_logger, "configured", False):
-        return
-    LOGGER.setLevel(logging.DEBUG)
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    handler = TimedRotatingFileHandler(
-        LOG_FILE,
-        when="midnight",
-        interval=1,
-        backupCount=1,
-        encoding="utf-8",
-        utc=False,
-    )
-    handler.setFormatter(formatter)
-
-    def _compress_old_logs(handler):
-        log_dir = os.path.dirname(handler.baseFilename)
-        for filename in os.listdir(log_dir):
-            if filename.startswith("ultra.log.") and not filename.endswith(".gz"):
-                full_path = os.path.join(log_dir, filename)
-                gz_path = f"{full_path}.gz"
-                if not os.path.exists(gz_path):
-                    with open(full_path, "rb") as f_in, gzip.open(gz_path, "wb") as f_out:
-                        shutil.copyfileobj(f_in, f_out)
-                    os.remove(full_path)
-
-    handler.rotator = lambda source, dest: shutil.copy2(source, dest)
-    handler.namer = lambda name: name
-    LOGGER.addHandler(handler)
-
-    original_doRollover = handler.doRollover
-
-    def rollover_with_compress(*args, **kwargs):
-        original_doRollover(*args, **kwargs)
-        _compress_old_logs(handler)
-
-    handler.doRollover = rollover_with_compress  # type: ignore
-    _setup_file_logger.configured = True
-
-
-_setup_file_logger()
 
 CALLS = [
     ("router_status", "zwrt_router.api", "router_get_status", {}),
