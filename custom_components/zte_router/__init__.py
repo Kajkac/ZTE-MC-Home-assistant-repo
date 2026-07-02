@@ -23,7 +23,7 @@ from .const import (
 )
 from .g5_ultra_client import G5UltraRouterRunner
 from .router_backend import run_router_commands
-from .sensor import ZTERouterDataUpdateCoordinator, ZTERouterSMSUpdateCoordinator
+from .sensor import ZTERouterDataUpdateCoordinator, ZTERouterSMSUpdateCoordinator, extract_json
 
 _LOGGER = logging.getLogger(__name__)
 SERVICE_UBUS_CALL = "ubus_call"
@@ -468,7 +468,11 @@ def _ensure_services_registered(hass: HomeAssistant) -> None:
             raise HomeAssistantError(f"Failed to send SMS: {err}") from err
 
         try:
-            parsed = json.loads(raw)
+            # For MC-series, run_router_commands() shells out to mc.py, whose
+            # stdout includes a "Commands received: [...]" line before the
+            # JSON result -- not pure JSON on its own. extract_json() slices
+            # out just the {...} block, same as the sensor coordinator does.
+            parsed = json.loads(extract_json(raw))
         except Exception as err:
             raise HomeAssistantError(f"Unexpected response from router: {raw}") from err
 
