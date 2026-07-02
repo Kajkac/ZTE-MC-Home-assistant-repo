@@ -1,8 +1,24 @@
 import argparse
 import json
+import os
+import sys
 from pathlib import Path
 
-from g5_ultra_client import G5UltraRouterRunner
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_CANDIDATE_DIRS = [
+    SCRIPT_DIR,  # g5_ultra_client.py copied next to this script (flat folder layout)
+    os.path.join(os.path.dirname(SCRIPT_DIR), "custom_components", "zte_router"),  # full repo checkout
+]
+_CLIENT_DIR = next((d for d in _CANDIDATE_DIRS if os.path.isfile(os.path.join(d, "g5_ultra_client.py"))), None)
+if _CLIENT_DIR is None:
+    sys.exit(
+        "Could not find g5_ultra_client.py. Copy it into the same folder as "
+        "this script, or run from a full repo checkout (Testing scripts/ next "
+        "to custom_components/zte_router/)."
+    )
+sys.path.insert(0, _CLIENT_DIR)
+
+from g5_ultra_client import G5UltraRouterRunner  # noqa: E402  (must come after sys.path setup above)
 
 
 def main() -> None:

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import json
 import sys
 import os
+import tempfile
 import time
 import secrets
 import base64
@@ -158,7 +159,7 @@ class zteRouter:
         self.try_set_protocol()
         self.referer = f"{self.protocol}://{self.ip}/"
 
-    CERT_FILE = "/tmp/zte_router_cert.pem"
+    CERT_FILE = os.path.join(tempfile.gettempdir(), "zte_router_cert.pem")
 
     def request_with_session(self, method, url, headers=None, body=None):
         if headers is None:
