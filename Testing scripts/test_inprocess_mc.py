@@ -70,6 +70,36 @@ import mc  # noqa: E402  (must come after sys.path setup above)
 STRICT_COMPARE_COMMANDS = [1, 2, 3, 7, 16]  # zteinfo, zteinfo2, ztesmsinfo, zteinfo3, zteinfo4
 INFO_ONLY_COMMANDS = [6]  # last SMS -- formatting of the "no SMS" dummy differs slightly, shown but not diffed
 
+# Fields that are expected to change between two sequential calls a second or
+# two apart -- live signal readings, running byte/time counters, connection
+# durations -- because the router's real state moves between the subprocess
+# call and the in-process call, not because the two approaches disagree.
+NOISY_KEYS = {
+    "realtime_tx_bytes", "realtime_rx_bytes", "realtime_time",
+    "realtime_tx_thrpt", "realtime_rx_thrpt", "monthly_time",
+    "connect_time", "rssi", "lte_rssi", "rscp", "lte_rsrp", "lte_rsrq",
+    "lte_snr", "Z5g_snr", "Z5g_rsrp", "Z5g_rsrq", "Z5g_SINR", "ecio",
+    "signalbar",
+}
+
+
+def diff_values(path, a, b, out):
+    """Recursively collect leaf-level (path, a, b) differences between two
+    possibly-nested dict/list structures."""
+    if isinstance(a, dict) and isinstance(b, dict):
+        for key in sorted(set(a) | set(b)):
+            child_path = f"{path}.{key}" if path else key
+            diff_values(child_path, a.get(key), b.get(key), out)
+    elif isinstance(a, list) and isinstance(b, list) and len(a) == len(b):
+        for i, (x, y) in enumerate(zip(a, b)):
+            diff_values(f"{path}[{i}]", x, y, out)
+    elif a != b:
+        out.append((path, a, b))
+
+
+def _leaf_key(path):
+    return path.rsplit(".", 1)[-1].split("[")[0]
+
 
 def run_via_subprocess(ip, password, username, commands):
     cmd = [sys.executable, MC_PATH, ip, password, commands, username or ""]
@@ -128,21 +158,48 @@ def test_single_router(ip, password, username, label):
     print("Running via PROPOSED in-process approach...")
     inproc_result = run_in_process(ip, password, username, all_ids)
 
-    mismatches = []
+    real_mismatches = []
+    noisy_diffs = []
     for cmd_id in STRICT_COMPARE_COMMANDS:
         sub_val = sub_result.get(str(cmd_id), sub_result.get(cmd_id))
         proc_val = inproc_result.get(cmd_id)
-        if sub_val != proc_val:
-            mismatches.append((cmd_id, sub_val, proc_val))
+        if sub_val == proc_val:
+            continue
+        leaves = []
+        diff_values("", sub_val, proc_val, leaves)
+        if not leaves:
+            # Differs only in structure (e.g. list length changed) -- can't
+            # attribute to a known-noisy field, treat as a real mismatch.
+            real_mismatches.append((cmd_id, sub_val, proc_val))
+            continue
+        for path, a, b in leaves:
+            if _leaf_key(path) in NOISY_KEYS:
+                noisy_diffs.append((cmd_id, path, a, b))
+            else:
+                real_mismatches.append((cmd_id, path or "(whole value)", a, b))
 
-    if mismatches:
-        print(f"\n  MISMATCHES FOUND ({len(mismatches)}) -- do not proceed with the rewrite until these are understood:")
-        for cmd_id, sub_val, proc_val in mismatches:
-            print(f"\n  Command {cmd_id}:")
-            print(f"    subprocess : {str(sub_val)[:400]}")
-            print(f"    in-process : {str(proc_val)[:400]}")
+    if real_mismatches:
+        print(f"\n  MISMATCHES FOUND ({len(real_mismatches)}) -- do not proceed with the rewrite until these are understood:")
+        for entry in real_mismatches:
+            if len(entry) == 3:
+                cmd_id, sub_val, proc_val = entry
+                print(f"\n  Command {cmd_id}:")
+                print(f"    subprocess : {str(sub_val)[:400]}")
+                print(f"    in-process : {str(proc_val)[:400]}")
+            else:
+                cmd_id, path, a, b = entry
+                print(f"\n  Command {cmd_id}, field '{path}':")
+                print(f"    subprocess : {a!r}")
+                print(f"    in-process : {b!r}")
     else:
         print("\n  MATCH: in-process results are identical to the current subprocess results for all data-fetch commands.")
+
+    if noisy_diffs:
+        print(f"\n  ({len(noisy_diffs)} field(s) differed but only in known live-changing values -- expected, not a bug, since the two calls happen a second or two apart:")
+        for cmd_id, path, a, b in noisy_diffs:
+            print(f"    Command {cmd_id}, field '{path}': subprocess={a!r} in-process={b!r}")
+
+    mismatches = real_mismatches
 
     print(f"\n  Command 6 (last SMS, informational only -- dummy 'no SMS' formatting may legitimately differ):")
     print(f"    subprocess : {str(sub_result.get('6', sub_result.get(6)))[:300]}")
