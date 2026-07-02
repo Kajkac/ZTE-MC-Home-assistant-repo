@@ -1,8 +1,14 @@
 import argparse
 import json
+import os
+import sys
 from pathlib import Path
 
-from g5_ultra_client import G5UltraRouterRunner
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+MC_DIR = os.path.join(os.path.dirname(SCRIPT_DIR), "custom_components", "zte_router")
+sys.path.insert(0, MC_DIR)
+
+from g5_ultra_client import G5UltraRouterRunner  # noqa: E402  (must come after sys.path setup above)
 
 
 def main() -> None:

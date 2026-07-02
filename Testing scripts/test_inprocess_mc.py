@@ -25,8 +25,9 @@ connected clients (zteinfo4).
 
 Setup (run this on a machine with network access to your routers):
     pip install cryptography
-    # Copy mc.py and pygsm7.py into the same folder as this script
-    # (they already live together in custom_components/zte_router/)
+    # Run this script from inside the "Testing scripts" folder, keeping the
+    # repo layout intact -- it locates mc.py at
+    # ../custom_components/zte_router/mc.py automatically.
 
 Usage:
     # Test one router:
@@ -48,8 +49,9 @@ import subprocess
 import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, SCRIPT_DIR)
-MC_PATH = os.path.join(SCRIPT_DIR, "mc.py")
+MC_DIR = os.path.join(os.path.dirname(SCRIPT_DIR), "custom_components", "zte_router")
+sys.path.insert(0, MC_DIR)
+MC_PATH = os.path.join(MC_DIR, "mc.py")
 
 import mc  # noqa: E402  (must come after sys.path setup above)
 
