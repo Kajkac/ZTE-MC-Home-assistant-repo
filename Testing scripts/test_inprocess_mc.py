@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Validates the proposed mc.py "in-process" rewrite against real MC-series
-hardware, without touching any Home Assistant code or your live setup.
+Validates mc.py's in-process rewrite (mc.run_commands(), now used directly
+by router_backend.py) against real MC-series hardware, without touching any
+Home Assistant code or your live setup.
 
-This proves two things before router_backend.py's subprocess-based
-_run_mc_commands() gets rewritten to call zteRouter directly:
+This proves two things:
 
-  1. Calling zteRouter's methods directly (in-process) produces the exact
-     same data as the current approach (spawning "python3 mc.py ..." as a
+  1. Calling mc.run_commands() directly (in-process) produces the exact
+     same data as the old approach (spawning "python3 mc.py ..." as a
      subprocess and parsing its stdout).
 
   2. Running TWO different routers' zteRouter instances in the same
@@ -124,32 +124,14 @@ def run_via_subprocess(ip, password, username, commands):
 
 
 def run_in_process(ip, password, username, command_ids):
-    """Mirrors mc.py's own __main__ dispatcher for the read-only commands."""
-    zte = mc.zteRouter(ip, username, password)
-    zte.authenticate()
-    results = {}
-    for cmd_id in command_ids:
-        try:
-            if cmd_id == 1:
-                results[cmd_id] = json.loads(zte.zteinfo())
-            elif cmd_id == 2:
-                results[cmd_id] = json.loads(zte.zteinfo2())
-            elif cmd_id == 3:
-                results[cmd_id] = json.loads(zte.ztesmsinfo())
-            elif cmd_id == 6:
-                result = zte.parsesms()
-                data = json.loads(result) if result else {}
-                messages = data.get("messages", [])
-                results[cmd_id] = messages[0] if messages else {"content": "NO SMS IN MEMORY"}
-            elif cmd_id == 7:
-                results[cmd_id] = json.loads(zte.zteinfo3())
-            elif cmd_id == 16:
-                results[cmd_id] = json.loads(zte.zteinfo4())
-            else:
-                results[cmd_id] = f"(not a read-only command in this harness: {cmd_id})"
-        except Exception as e:
-            results[cmd_id] = {"_error": str(e)}
-    return results
+    """Calls the real production entry point (mc.run_commands) -- the same
+    function router_backend.py now uses inside Home Assistant -- restricted
+    here to the read-only command IDs passed in."""
+    commands_str = ",".join(str(c) for c in command_ids)
+    parsed = json.loads(mc.run_commands(ip, password, username, commands_str))
+    # JSON round-tripping turns dict int keys into strings; normalize back to
+    # int keys so this script's existing lookups keep working unchanged.
+    return {int(k): v for k, v in parsed.items()}
 
 
 def test_single_router(ip, password, username, label):
