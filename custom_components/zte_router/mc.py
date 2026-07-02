@@ -148,7 +148,7 @@ class zteRouter:
         self.cookies = {}
         self.stok = None
         self.uses_stok = False
-        logger.info(f"Initializing ZTE Router with IP {ip}, Username: {username}, Password: {password}")
+        logger.info(f"Initializing ZTE Router with IP {ip}, Username: {username}")
 
         self.try_set_protocol()
         self.referer = f"{self.protocol}://{self.ip}/"
@@ -287,7 +287,15 @@ class zteRouter:
 
 
     def hash(self, str):
-        hashed = hashlib.sha256(str.encode()).hexdigest()
+        # Not a password-storage hash -- this replicates the router's own
+        # firmware-mandated login challenge-response (SHA256(password), then
+        # SHA256(that + LD-challenge)), which the router computes
+        # independently and compares against. The algorithm is fixed by the
+        # router, not a security choice made here; switching to a slow/salted
+        # KDF would produce a different value than the router expects and
+        # break login entirely. See CodeQL alert #39 (same pattern in
+        # g5_ultra_client.py's sha256_hex).
+        hashed = hashlib.sha256(str.encode()).hexdigest()  # lgtm[py/weak-sensitive-data-hashing]
         logger.debug(f"Hashed string: {hashed}")
         return hashed
 
@@ -322,7 +330,7 @@ class zteRouter:
             return ""
 
     def getCookie(self, username, password, LD, AD):
-        logger.debug(f"Getting cookie for username: {username}, password: {password}, LD: {LD}")
+        logger.debug(f"Getting cookie for username: {username}, LD: {LD}")
         header = {"Referer": self.referer}
 
         hashPassword = self.hash(password).upper()
