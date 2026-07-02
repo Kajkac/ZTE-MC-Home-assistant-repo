@@ -22,7 +22,13 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 import re
-from pygsm7 import encodeMessage, decodeMessage
+try:
+    from .pygsm7 import encodeMessage, decodeMessage
+except ImportError:
+    # Relative import fails when mc.py is run directly as a script (e.g. by
+    # the standalone Testing scripts/test_inprocess_mc.py harness), since
+    # there's no enclosing package in that context.
+    from pygsm7 import encodeMessage, decodeMessage
 import traceback  # <-- add this at the top if not already
 from logging.handlers import TimedRotatingFileHandler
 import gzip
@@ -32,7 +38,7 @@ import shutil
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 log_certificate_details = False  # Set to True if you want to see certificate details in logs
 # Configure the logger
-logger = logging.getLogger('homeassistant.components.zte_router')
+logger = logging.getLogger(__name__)
 
 from logging.handlers import TimedRotatingFileHandler
 import gzip
@@ -101,8 +107,11 @@ if __name__ == "__main__":
         # doRolloverAndCompress()
 
 else:
-    # Suppress logging when imported
-    logger.setLevel(logging.WARNING)
+    # Imported (in-process, e.g. from Home Assistant) -- don't force a level
+    # here, let it inherit from the root/HA logging config like every other
+    # module in this integration, instead of silently overriding a user's
+    # own `logger:` settings for this component.
+    pass
 
 # Create a PoolManager instance with permissive TLS settings for router self-signed/weak certs.
 ssl_context = ssl.create_default_context()
@@ -1191,19 +1200,16 @@ getsmstimeEncoded = urllib.parse.quote(getsmstime, safe="")
 #messageEncoded = gsm_encode(message)
 #outputmessage = messageEncoded.decode()
 
-if __name__ == "__main__":
-    if len(sys.argv) < 4:
-        print("Usage: script.py ip password command1[,command2,...] [username]")
-        sys.exit(1)
+def run_commands(ip, password, username=None, commands="", phone_number=None, message=None):
+    """Authenticate against an MC-series router and execute one or more
+    numeric command IDs in-process, returning a JSON string of
+    {"<cmd_id>": <result>, ...}.
 
-    ip = sys.argv[1]
-    password = sys.argv[2]
-    commands = sys.argv[3].split(',')
-    print(f"Commands received: {commands}")
-    username = sys.argv[4] if len(sys.argv) > 4 else None
-    phone_number = sys.argv[5] if len(sys.argv) > 5 else None
-    message = sys.argv[6] if len(sys.argv) > 6 else None
-
+    This is the single source of truth for the command-ID dispatch table --
+    it used to be duplicated directly in the __main__ block below, back when
+    this module only ever ran as a subprocess spawned once per command.
+    """
+    command_list = [cmd.strip() for cmd in str(commands).split(",") if cmd.strip()]
     zte = zteRouter(ip, username, password)
 
     # Single authentication before executing the commands
@@ -1211,7 +1217,7 @@ if __name__ == "__main__":
 
     results = {}
 
-    for command in commands:
+    for command in command_list:
         try:
             cmd_id = int(command)
         except Exception:
@@ -1270,7 +1276,7 @@ if __name__ == "__main__":
             elif cmd_id == 7:
                 results[cmd_id] = json.loads(zte.zteinfo3())
             elif cmd_id == 8:
-                if len(commands) > 1:
+                if len(command_list) > 1:
                     results[cmd_id] = "SMS sending not supported in multi-command mode."
                 else:
                     if phone_number and message:
@@ -1305,4 +1311,20 @@ if __name__ == "__main__":
         except Exception as e:
             results[cmd_id] = f"Error: {e}"
 
-    print(json.dumps(results, indent=2))
+    return json.dumps(results)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 4:
+        print("Usage: script.py ip password command1[,command2,...] [username]")
+        sys.exit(1)
+
+    cli_ip = sys.argv[1]
+    cli_password = sys.argv[2]
+    cli_commands = sys.argv[3]
+    print(f"Commands received: {cli_commands.split(',')}")
+    cli_username = sys.argv[4] if len(sys.argv) > 4 else None
+    cli_phone_number = sys.argv[5] if len(sys.argv) > 5 else None
+    cli_message = sys.argv[6] if len(sys.argv) > 6 else None
+
+    print(run_commands(cli_ip, cli_password, cli_username, cli_commands, cli_phone_number, cli_message))

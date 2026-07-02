@@ -1,12 +1,11 @@
 import logging
-import subprocess
 from typing import Optional
 
+from . import mc
 from .const import ROUTER_TYPE_G5_ULTRA
 from .g5_ultra_client import G5UltraRouterRunner
 
 LOGGER = logging.getLogger(__name__)
-MC_SCRIPT_PATH = "/config/custom_components/zte_router/mc.py"
 
 
 def run_router_commands(
@@ -33,34 +32,8 @@ def _run_mc_commands(
     phone_number: Optional[str],
     message: Optional[str],
 ) -> str:
-    """Run the legacy mc.py script via subprocess."""
-    username = username or ""
-    command_list = [cmd.strip() for cmd in str(commands).split(",") if cmd.strip()]
-    cmd = [
-        "python3",
-        MC_SCRIPT_PATH,
-        str(ip),
-        str(password),
-        ",".join(command_list),
-        username,
-    ]
-
-    if len(command_list) == 1 and command_list[0] == "8" and phone_number and message:
-        cmd.extend([phone_number, message])
-
-    masked_cmd = _mask_sensitive_values(cmd, [3])
-    LOGGER.debug("Executing MC router command: %s", masked_cmd)
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        return result.stdout
-    except subprocess.CalledProcessError as err:
-        LOGGER.error("MC router command failed: %s", err)
-        raise
-
-
-def _mask_sensitive_values(items, indexes):
-    masked = items.copy()
-    for index in indexes:
-        if 0 <= index < len(masked):
-            masked[index] = "*****"
-    return masked
+    """Run MC-series commands in-process via zteRouter (mc.py)."""
+    LOGGER.debug("Executing MC router command(s): %s", commands)
+    return mc.run_commands(
+        str(ip), str(password), username, commands, phone_number=phone_number, message=message
+    )
