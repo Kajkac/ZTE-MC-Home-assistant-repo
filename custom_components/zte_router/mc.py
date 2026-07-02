@@ -38,8 +38,13 @@ import gzip
 import shutil
 
 if __name__ == "__main__":
-    # Configure logging when run directly
-    logger.setLevel(logging.DEBUG)
+    # Configure logging when run directly. This runs as a standalone
+    # subprocess on every single MC-series command, so DEBUG here produced
+    # very verbose output on every poll cycle -- exactly what grew ultra.log
+    # to 100+ MB on the G5 Ultra side (same root cause, different file).
+    # WARNING keeps mc.log useful for troubleshooting failures without
+    # logging every successful request/response.
+    logger.setLevel(logging.WARNING)
 
     if not logger.handlers:
         # Common formatter

@@ -23,7 +23,7 @@ from .const import (
 )
 from .g5_ultra_client import G5UltraRouterRunner
 from .router_backend import run_router_commands
-from .sensor import ZTERouterDataUpdateCoordinator, ZTERouterSMSUpdateCoordinator, extract_json
+from .coordinators import ZTERouterDataUpdateCoordinator, ZTERouterSMSUpdateCoordinator, extract_json
 
 _LOGGER = logging.getLogger(__name__)
 SERVICE_UBUS_CALL = "ubus_call"
