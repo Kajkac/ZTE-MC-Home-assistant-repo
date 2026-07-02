@@ -25,9 +25,9 @@ connected clients (zteinfo4).
 
 Setup (run this on a machine with network access to your routers):
     pip install cryptography
-    # Run this script from inside the "Testing scripts" folder, keeping the
-    # repo layout intact -- it locates mc.py at
-    # ../custom_components/zte_router/mc.py automatically.
+    # Either copy mc.py and pygsm7.py into the same folder as this script,
+    # or run from a full repo checkout (Testing scripts/ next to
+    # custom_components/zte_router/) -- both layouts are auto-detected.
 
 Usage:
     # Test one router:
@@ -49,7 +49,17 @@ import subprocess
 import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-MC_DIR = os.path.join(os.path.dirname(SCRIPT_DIR), "custom_components", "zte_router")
+_CANDIDATE_MC_DIRS = [
+    SCRIPT_DIR,  # mc.py copied next to this script (flat folder layout)
+    os.path.join(os.path.dirname(SCRIPT_DIR), "custom_components", "zte_router"),  # full repo checkout
+]
+MC_DIR = next((d for d in _CANDIDATE_MC_DIRS if os.path.isfile(os.path.join(d, "mc.py"))), None)
+if MC_DIR is None:
+    sys.exit(
+        "Could not find mc.py. Copy mc.py and pygsm7.py into the same folder as "
+        "this script, or run from a full repo checkout (Testing scripts/ next "
+        "to custom_components/zte_router/)."
+    )
 sys.path.insert(0, MC_DIR)
 MC_PATH = os.path.join(MC_DIR, "mc.py")
 
