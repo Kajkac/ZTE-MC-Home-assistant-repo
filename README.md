@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/github/license/Kajkac/ZTE-MC-Home-assistant-repo)](LICENSE)
 [![Installs](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=active%20installs&suffix=%20&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.zte_router.total)](https://analytics.home-assistant.io/custom_integrations.json)
 
-[Install via HACS](#-installation) · [Supported devices](#-supported-devices) · [Services](#-services) · [Known issues](#-known-issues)
+[Install via HACS](#-installation) · [Supported devices](#-supported-devices) · [Beta versions](#-beta-versions) · [Services](#-services) · [Known issues](#-known-issues)
 
 </div>
 
@@ -79,7 +79,21 @@ Similar/rebadged variants of these chassis families are generally expected to wo
 
 </details>
 
-### Beta channel
+![Screenshot](https://raw.githubusercontent.com/Kajkac/ZTE-MC-Home-assistant-repo/main/zte.png)
+
+## 🧪 Beta Versions
+
+New features land in **beta releases first** — versions tagged like `1.0.56b1`, `1.0.56b2`, etc. — before being promoted to a stable release. This is where things like new sensors, switches, or services get real-world testing before everyone gets them by default.
+
+> [!IMPORTANT]
+> Beta versions are for **testing, not production**. They may contain bugs, incomplete features, or ubus/API calls that haven't been verified across all router models yet. Don't rely on a beta build for anything critical (e.g. don't test firewall/NAT changes on a router you can't physically access if something goes wrong).
+
+**What's typically still in beta:**
+
+- Newly-added G5 Ultra controls (band/cell locking, network mode, USSD, router-level settings like firewall/NAT/UPnP/DMZ/DNS/DDNS/APN) — these were reverse-engineered from ubus calls and validated on specific hardware, but may behave differently on other G5-series firmware
+- Anything explicitly marked `(beta)` in its service/entity name or description
+
+**How to opt in:**
 
 <details>
 <summary>Install a beta build from HACS</summary>
@@ -90,7 +104,7 @@ Similar/rebadged variants of these chassis families are generally expected to wo
 
 </details>
 
-![Screenshot](https://raw.githubusercontent.com/Kajkac/ZTE-MC-Home-assistant-repo/main/zte.png)
+Found something broken in a beta? [Open an issue](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/issues) with your router model, firmware version, and what you tried — that's exactly what the beta cycle is for.
 
 ## 🔧 Services
 
