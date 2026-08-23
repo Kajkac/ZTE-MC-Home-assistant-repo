@@ -106,7 +106,7 @@ class ConnectedBandsSensor(ZTERouterEntity):
         self.entity_registry_enabled_default = not disabled_by_default
         self._attr_is_diagnostics = True  # Ensure ConnectedBands is marked as diagnostics
         self._attr_should_poll = False  # Disable default polling
-        _LOGGER.info(f"Initializing Connected Bands sensor")
+        _LOGGER.debug(f"Initializing Connected Bands sensor")
 
     @property
     def name(self):
@@ -149,7 +149,7 @@ class ConnectedBandsSensor(ZTERouterEntity):
         return None
 
     async def async_update(self):
-        _LOGGER.info(f"Manual update requested for Connected Bands sensor at {datetime.now()}")
+        _LOGGER.debug(f"Manual update requested for Connected Bands sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     @guard_stale_data
@@ -199,7 +199,7 @@ class ConnectedBandsSensor(ZTERouterEntity):
                 "ca_bands": ca_bands_formatted or "--",
                 "enb_id": enb_id or "--",
             }
-            _LOGGER.info(f"Connected Bands sensor updated. Old state: {old_state}, New state: {self._state}")
+            _LOGGER.debug(f"Connected Bands sensor updated. Old state: {old_state}, New state: {self._state}")
         else:
             _LOGGER.warning("Connected Bands sensor: No valid data or update failed. Setting state to Unavailable")
             self._state = None

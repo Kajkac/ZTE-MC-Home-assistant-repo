@@ -3,6 +3,7 @@ import asyncio
 from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, MANUFACTURER, MODEL, ROUTER_TYPE_G5_ULTRA, ROUTER_TYPE_MC801
+from .log_util import describe_text, redact_phone
 from .router_backend import run_router_commands
 
 _LOGGER = logging.getLogger(__name__)
@@ -118,7 +119,7 @@ class ZTERouterButton(CoordinatorEntity, ButtonEntity):
             if not self._phone_number or not self._sms_message:
                 _LOGGER.error(f"Phone number or message not set for {self._name}")
                 return
-            _LOGGER.info(f"Sending SMS to {self._phone_number} with message: {self._sms_message}")
+            _LOGGER.info(f"Sending SMS to {redact_phone(self._phone_number)} with message: {describe_text(self._sms_message)}")
 
         await self.hass.async_add_executor_job(self._execute_command)
 

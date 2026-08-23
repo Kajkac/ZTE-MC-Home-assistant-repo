@@ -28,13 +28,13 @@ class ZTERouterDataUpdateCoordinator(DataUpdateCoordinator):
         self.config_entry = None
         self._data = {}
         self.allow_stale_data = allow_stale_data
-        _LOGGER.info(f"Initializing ZTERouterDataUpdateCoordinator with Ping check interval: {interval} seconds")
+        _LOGGER.debug(f"Initializing ZTERouterDataUpdateCoordinator with Ping check interval: {interval} seconds")
         super().__init__(
             hass, _LOGGER, name="zte_router", update_interval=timedelta(seconds=interval)
         )
 
     async def _async_update_data(self):
-        _LOGGER.info("Starting _async_update_data in ZTERouterDataUpdateCoordinator at %s", datetime.now())
+        _LOGGER.debug("Starting _async_update_data in ZTERouterDataUpdateCoordinator at %s", datetime.now())
         new_data = {}
         keys = {3: "dynamic_data", 7: "status_data", 16: "client_data"}
         cmds = ','.join(map(str, keys.keys()))
@@ -100,7 +100,7 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
         self.username_entry = username_entry if username_entry else ""
         self.router_type = router_type
         self._data = {}
-        _LOGGER.info(f"Initializing SMSUpdateCoordinator with SMS check interval: {sms_check_interval} seconds")
+        _LOGGER.debug(f"Initializing SMSUpdateCoordinator with SMS check interval: {sms_check_interval} seconds")
         super().__init__(
             hass,
             _LOGGER,
@@ -109,7 +109,7 @@ class ZTERouterSMSUpdateCoordinator(DataUpdateCoordinator):
         )
 
     async def _async_update_data(self):
-        _LOGGER.info("Starting _async_update_data in ZTERouterSMSUpdateCoordinator at %s", datetime.now())
+        _LOGGER.debug("Starting _async_update_data in ZTERouterSMSUpdateCoordinator at %s", datetime.now())
         new_data = {}
         keys = {6: "sms_data"}
         cmds = ','.join(map(str, keys.keys()))

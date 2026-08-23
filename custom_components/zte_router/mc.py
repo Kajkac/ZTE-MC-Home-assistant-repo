@@ -24,25 +24,21 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 import re
 try:
     from .pygsm7 import encodeMessage, decodeMessage
+    from .log_util import describe_text, redact, redact_phone
 except ImportError:
     # Relative import fails when mc.py is run directly as a script (e.g. by
     # the standalone Testing scripts/test_inprocess_mc.py harness), since
     # there's no enclosing package in that context.
     from pygsm7 import encodeMessage, decodeMessage
+    from log_util import describe_text, redact, redact_phone
 import traceback  # <-- add this at the top if not already
 from logging.handlers import TimedRotatingFileHandler
-import gzip
-import shutil
 
 # Disable warnings for insecure connections
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 log_certificate_details = False  # Set to True if you want to see certificate details in logs
 # Configure the logger
 logger = logging.getLogger(__name__)
-
-from logging.handlers import TimedRotatingFileHandler
-import gzip
-import shutil
 
 if __name__ == "__main__":
     # Configure logging when run directly. This runs as a standalone
@@ -78,33 +74,11 @@ if __name__ == "__main__":
         rotating_handler.setFormatter(formatter)
         rotating_handler.suffix = "%Y-%m-%d"
 
-        # Optional: Compress old logs after rotation
-        def compress_old_logs(handler):
-            log_dir = os.path.dirname(handler.baseFilename)
-            for filename in os.listdir(log_dir):
-                if filename.startswith("mc.log.") and not filename.endswith(".gz"):
-                    full_path = os.path.join(log_dir, filename)
-                    gz_path = full_path + ".gz"
-                    if not os.path.exists(gz_path):  # Only compress if not already
-                        with open(full_path, 'rb') as f_in, gzip.open(gz_path, 'wb') as f_out:
-                            shutil.copyfileobj(f_in, f_out)
-                        os.remove(full_path)
-                        logger.info(f"Compressed log file: {gz_path}")
-
-        # Hook into the handler’s rotation
-        def doRolloverAndCompress():
-            rotating_handler.doRollover()
-            compress_old_logs(rotating_handler)
-
-        # Optional override: copy on rotate + keep filename format
-        rotating_handler.rotator = lambda source, dest: shutil.copy2(source, dest)
-        rotating_handler.namer = lambda name: name
-
-        # Add the handler
+        # Rotation is left to the stdlib default. The previous `rotator`
+        # override copied the live file to the dated backup instead of
+        # renaming it, so mc.log was reopened in append mode and never
+        # truncated -- it grew without bound (#40).
         logger.addHandler(rotating_handler)
-
-        # Optional: trigger rollover + compress manually at startup
-        # doRolloverAndCompress()
 
 else:
     # Imported (in-process, e.g. from Home Assistant) -- don't force a level
@@ -153,7 +127,7 @@ class zteRouter:
         self._zte_auth_stok = stok
         self._zte_auth_AD = AD
         self._zte_auth_LD = LD
-        logger.info("Authentication credentials stored in object instance")
+        logger.debug("Authentication credentials stored in object instance")
 
     def __init__(self, ip, username, password):
         self.ip = ip
@@ -163,7 +137,7 @@ class zteRouter:
         self.cookies = {}
         self.stok = None
         self.uses_stok = False
-        logger.info(f"Initializing ZTE Router with IP {ip}, Username: {username}")
+        logger.debug(f"Initializing ZTE Router with IP {ip}, Username: {username}")
 
         self.try_set_protocol()
         self.referer = f"{self.protocol}://{self.ip}/"
@@ -193,7 +167,7 @@ class zteRouter:
         if os.path.exists(self.CERT_FILE):
             with open(self.CERT_FILE, 'r') as cert_file:
                 pem_cert = cert_file.read()
-            logger.info(f"Loaded SSL certificate from disk: {self.CERT_FILE}")
+            logger.debug(f"Loaded SSL certificate from disk: {self.CERT_FILE}")
             self.parse_certificate(pem_cert)
             return pem_cert
 
@@ -210,7 +184,7 @@ class zteRouter:
                     pem_cert = ssl.DER_cert_to_PEM_cert(der_cert)
                     with open(self.CERT_FILE, 'w') as cert_file:
                         cert_file.write(pem_cert)
-                    logger.info(f"SSL certificate for {hostname}:{port} retrieved and stored successfully")
+                    logger.debug(f"SSL certificate for {hostname}:{port} retrieved and stored successfully")
                     self.parse_certificate(pem_cert)
                     return pem_cert
         except Exception as e:
@@ -289,12 +263,12 @@ class zteRouter:
                 response = s.request('GET', url, timeout=2, retries=2)  # reduced timeout and retries
                 if response.status in [200, 302, 301]:
                     self.protocol = protocol
-                    logger.info(f"Protocol set to {protocol}")
+                    logger.debug(f"Protocol set to {protocol}")
                     if protocol == "https":
                         self.get_certificate_info(self.ip)
                     return
             except Exception as e:
-                logger.info(f"Failed to connect using {protocol}: {e}, trying next protocol.")
+                logger.debug(f"Failed to connect using {protocol}: {e}, trying next protocol.")
 
         # Instead of raising, handle router unavailability gracefully:
         logger.warning("Router is unavailable, protocol not set.")
@@ -311,7 +285,7 @@ class zteRouter:
         # break login entirely. See CodeQL alert #39 (same pattern in
         # g5_ultra_client.py's sha256_hex).
         hashed = hashlib.sha256(str.encode()).hexdigest()  # lgtm[py/weak-sensitive-data-hashing]
-        logger.debug(f"Hashed string: {hashed}")
+        logger.debug(f"Hashed string: {redact(hashed)}")
         return hashed
 
     def getVersion(self):
@@ -323,7 +297,7 @@ class zteRouter:
             r = self.request_with_session('GET', url, headers=header)
             data = r.data.decode('utf-8')
             version = json.loads(data)["wa_inner_version"]
-            logger.info(f"Router version: {version}")
+            logger.debug(f"Router version: {version}")
             return version
         except Exception as e:
             logger.error(f"Failed to fetch version: {e}")
@@ -338,14 +312,14 @@ class zteRouter:
             r = self.request_with_session('GET', url, headers=header)
             data = r.data.decode('utf-8')
             ld = json.loads(data)["LD"].upper()
-            logger.info(f"LD: {ld}")
+            logger.debug(f"LD: {redact(ld)}")
             return ld
         except Exception as e:
             logger.error(f"Failed to fetch LD: {e}")
             return ""
 
     def getCookie(self, username, password, LD, AD):
-        logger.debug(f"Getting cookie for username: {username}, LD: {LD}")
+        logger.debug(f"Getting cookie for username: {username}")
         header = {"Referer": self.referer}
 
         hashPassword = self.hash(password).upper()
@@ -385,16 +359,16 @@ class zteRouter:
             if stok:
                 self.uses_stok = True
                 self.stok = stok.value
-                logger.info(f"🔐 Router uses stok: {self.stok}")
+                logger.debug(f"🔐 Router uses stok: {redact(self.stok)}")
             else:
                 self.uses_stok = False
                 self.stok = None
-                logger.info("🔓 Router does NOT use stok (cookie-based only login)")
+                logger.debug("🔓 Router does NOT use stok (cookie-based only login)")
             # Save cookies for use in subsequent requests
             self.cookies = {}
             for key, morsel in cookie.items():
                 self.cookies[key] = morsel.value
-            logger.info(f"Obtained new session cookie: stok={self.stok}")
+            logger.debug(f"Obtained new session cookie: stok={redact(self.stok)}")
             return self.stok
         except Exception as e:
             logger.error(f"Failed to obtain cookie: {e}")
@@ -410,7 +384,7 @@ class zteRouter:
             r = self.request_with_session('POST', url, headers=header)
             data = r.data.decode('utf-8')
             rd = json.loads(data)["RD"]
-            logger.info(f"RD: {rd}")
+            logger.debug(f"RD: {redact(rd)}")
             return rd
         except Exception as e:
             logger.error(f"Failed to fetch RD: {e}")
@@ -450,7 +424,7 @@ class zteRouter:
             u = rd_json.get("RD", "")
 
             result = hash_function(a + u)
-            logger.info(f"AD: {result}")
+            logger.debug(f"AD: {redact(result)}")
             return result
         except Exception as e:
             logger.error(f"Failed to calculate AD: {e}")
@@ -459,7 +433,7 @@ class zteRouter:
 
 
     def sendsms(self, phone_number, message):
-        logger.debug(f"Sending SMS to {phone_number} with message: {message}")
+        logger.debug(f"Sending SMS to {redact_phone(phone_number)} with message: {describe_text(message)}")
         try:
             # MC888 firmware expects a fresh AD for protected write actions.
             AD = self.get_AD() or getattr(self, "_zte_auth_AD", None)
@@ -468,7 +442,7 @@ class zteRouter:
             # Encode phone number and message
             phoneNumberEncoded = urllib.parse.quote(phone_number, safe="")
             messageEncoded = encodeMessage(message)
-            logger.debug(f"Encoded SMS (GSM 7-bit): {messageEncoded}")
+            logger.debug(f"Encoded SMS (GSM 7-bit): {describe_text(messageEncoded)}")
             payload = {
                 'isTest': 'false',
                 'goformId': 'SEND_SMS',
@@ -509,7 +483,7 @@ class zteRouter:
                 red_ready = self._setup_red_crypto()
 
             if red_ready:
-                logger.info("Retrying SMS send with RED encryption payload")
+                logger.debug("Retrying SMS send with RED encryption payload")
                 AD = self.get_AD() or getattr(self, "_zte_auth_AD", None)
                 self._zte_auth_AD = AD
                 red_payload = {
@@ -540,7 +514,7 @@ class zteRouter:
                 except Exception:
                     pass
             else:
-                logger.info("RED SMS fallback unavailable in this session")
+                logger.warning("SMS send did not report success and RED fallback is unavailable")
 
             return r.status
         except Exception as e:
@@ -560,7 +534,7 @@ class zteRouter:
             cmd_url = f"{self.protocol}://{self.ip}/goform/goform_get_cmd_process?isTest=false&cmd=wa_inner_version%2Ccr_version%2Cnetwork_type%2Crssi%2Crscp%2Crmcc%2Crmnc%2Cenodeb_id%2C5g_rx0_rsrp%2C5g_rx1_rsrp%2Clte_rsrq%2Clte_rsrp%2CZ5g_snr%2CZ5g_rsrp%2CZCELLINFO_band%2CZ5g_dlEarfcn%2Clte_ca_pcell_arfcn%2Clte_ca_pcell_band%2Clte_ca_scell_band%2Clte_ca_pcell_bandwidth%2Clte_ca_scell_info%2Clte_ca_scell_bandwidth%2Cwan_lte_ca%2Clte_pci%2CZ5g_CELL_ID%2CZ5g_SINR%2Ccell_id%2Cwan_lte_ca%2Clte_ca_pcell_band%2Clte_ca_pcell_bandwidth%2Clte_ca_scell_band%2Clte_ca_scell_bandwidth%2Clte_ca_pcell_arfcn%2Clte_ca_scell_arfcn%2Clte_multi_ca_scell_info%2Cwan_active_band%2Cnr5g_pci%2Cnr5g_action_band%2Cnr5g_cell_id%2Clte_snr%2Cecio%2Cwan_active_channel%2Cnr5g_action_channel%2Cngbr_cell_info%2Cmonthly_tx_bytes%2Cmonthly_rx_bytes%2Clte_pci%2Clte_pci_lock%2Clte_earfcn_lock%2Cwan_ipaddr%2Cwan_apn%2Cpm_sensor_mdm%2Cpm_modem_5g%2Cnr5g_pci%2Cnr5g_action_channel%2Cnr5g_action_band%2CZ5g_SINR%2CZ5g_rsrp%2Cwan_active_band%2Cwan_active_channel%2Cwan_lte_ca%2Clte_multi_ca_scell_info%2Ccell_id%2Cdns_mode%2Cprefer_dns_manual%2Cstandby_dns_manual%2Cnetwork_type%2Crmcc%2Crmnc%2Clte_rsrq%2Clte_rssi%2Clte_rsrp%2Clte_snr%2Cwan_lte_ca%2Clte_ca_pcell_band%2Clte_ca_pcell_bandwidth%2Clte_ca_scell_band%2Clte_ca_scell_bandwidth%2Clte_ca_pcell_arfcn%2Clte_ca_scell_arfcn%2Cwan_ipaddr%2Cstatic_wan_ipaddr%2Copms_wan_mode%2Copms_wan_auto_mode%2Cppp_status%2Cloginfo%2Crealtime_time%2Csignalbar&multi_data=1"
             response = self.request_with_session('GET', cmd_url, headers=header)
             data = response.data.decode('utf-8')
-            logger.info("Fetched ZTE info successfully")
+            logger.debug("Fetched ZTE info successfully")
             return data
         except Exception as e:
             logger.error(f"Failed to fetch ZTE info: {e}")
@@ -578,7 +552,7 @@ class zteRouter:
             cmd_url = f"{self.protocol}://{self.ip}/goform/goform_get_cmd_process?multi_data=1&isTest=false&sms_received_flag_flag=0&sts_received_flag_flag=0&cmd=network_type%2Crssi%2Clte_rssi%2Crscp%2Clte_rsrp%2CZ5g_snr%2CZ5g_rsrp%2CZCELLINFO_band%2CZ5g_dlEarfcn%2Clte_ca_pcell_arfcn%2Clte_ca_pcell_band%2Clte_ca_scell_band%2Clte_ca_pcell_bandwidth%2Clte_ca_scell_info%2Clte_ca_scell_bandwidth%2Cwan_lte_ca%2Clte_pci%2CZ5g_CELL_ID%2CZ5g_SINR%2Ccell_id%2Cwan_lte_ca%2Clte_ca_pcell_band%2Clte_ca_pcell_bandwidth%2Clte_ca_scell_band%2Clte_ca_scell_bandwidth%2Clte_ca_pcell_arfcn%2Clte_ca_scell_arfcn%2Clte_multi_ca_scell_info%2Cwan_active_band%2Cnr5g_pci%2Cnr5g_action_band%2Cnr5g_cell_id%2Clte_snr%2Cecio%2Cwan_active_channel%2Cnr5g_action_channel%2Cmodem_main_state%2Cpin_status%2Copms_wan_mode%2Copms_wan_auto_mode%2Cloginfo%2Cnew_version_state%2Ccurrent_upgrade_state%2Cis_mandatory%2Cwifi_dfs_status%2Cbattery_value%2Cppp_dial_conn_fail_counter%2Cwifi_chip1_ssid1_auth_mode%2Cwifi_chip2_ssid1_auth_mode%2Csignalbar%2Cnetwork_type%2Cnetwork_provider%2Cppp_status%2Csimcard_roam%2Cspn_name_data%2Cspn_b1_flag%2Cspn_b2_flag%2Cwifi_onoff_state%2Cwifi_chip1_ssid1_ssid%2Cwifi_chip2_ssid1_ssid%2Cwan_lte_ca%2Cmonthly_tx_bytes%2Cmonthly_rx_bytes%2Cpppoe_status%2Cdhcp_wan_status%2Cstatic_wan_status%2Crmcc%2Crmnc%2Cmdm_mcc%2Cmdm_mnc%2CEX_SSID1%2Csta_ip_status%2CEX_wifi_profile%2Cm_ssid_enable%2CRadioOff%2Cwifi_chip1_ssid1_access_sta_num%2Cwifi_chip2_ssid1_access_sta_num%2Clan_ipaddr%2Cstation_mac%2Cwifi_access_sta_num%2Cbattery_charging%2Cbattery_vol_percent%2Cbattery_pers%2Crealtime_tx_bytes%2Crealtime_rx_bytes%2Crealtime_time%2Crealtime_tx_thrpt%2Crealtime_rx_thrpt%2Cmonthly_time%2Cdate_month%2Cdata_volume_limit_switch%2Cdata_volume_limit_size%2Cdata_volume_alert_percent%2Cdata_volume_limit_unit%2Croam_setting_option%2Cupg_roam_switch%2Cssid%2Cwifi_enable%2Cwifi_5g_enable%2Ccheck_web_conflict%2Cdial_mode%2Cprivacy_read_flag%2Cis_night_mode%2Cvpn_conn_status%2Cwan_connect_status%2Csms_received_flag%2Csts_received_flag%2Csms_unread_num%2Cwifi_chip1_ssid2_access_sta_num%2Cwifi_chip2_ssid2_access_sta_num&multi_data=1"
             response = self.request_with_session('GET', cmd_url, headers=header)
             data = response.data.decode('utf-8')
-            logger.info("Fetched ZTE info 2 successfully")
+            logger.debug("Fetched ZTE info 2 successfully")
             return data
         except Exception as e:
             logger.error(f"Failed to fetch ZTE info 2: {e}")
@@ -708,7 +682,7 @@ class zteRouter:
                     except Exception:
                         combined_data[key] = "N/A"
 
-            logger.info("✅ Fetched ZTE info using hybrid strategy")
+            logger.debug("✅ Fetched ZTE info using hybrid strategy")
             return json.dumps(combined_data)
 
         except Exception as e:
@@ -798,7 +772,7 @@ class zteRouter:
 
             # ✅ Merge all into one list
             combined_data["all_devices"] = combined_data["station_list"] + combined_data["lan_station_list"]
-            logger.info(f"Fetched and merged {len(combined_data['all_devices'])} total devices")
+            logger.debug(f"Fetched and merged {len(combined_data['all_devices'])} total devices")
 
             return json.dumps(combined_data)
 
@@ -820,7 +794,7 @@ class zteRouter:
 
             # Parse the response JSON
             data_json = json.loads(data)
-            logger.info("Fetched ZTE SMS info successfully")
+            logger.debug("Fetched ZTE SMS info successfully")
 
             # Calculate sms_capacity_left
             sms_nv_total = int(data_json.get("sms_nv_total", 0))
@@ -907,7 +881,7 @@ class zteRouter:
                 logger.warning("'messages' key is missing or invalid in SMS response; defaulting to empty list.")
                 response_json['messages'] = []
             messages = response_json['messages']
-            logger.info(f"Fetched {len(messages)} SMS messages")
+            logger.debug(f"Fetched {len(messages)} SMS messages")
             decode_errors = 0
             decrypted_any = False
 
@@ -980,7 +954,7 @@ class zteRouter:
                     'sms_class': '4'
                 }
                 response_json['messages'].append(dummy_message)
-            logger.info("Parsed all SMS messages successfully")
+            logger.debug("Parsed all SMS messages successfully")
             return json.dumps(response_json, indent=2)
         except Exception as e:
             logger.error(f"Failed to parse SMS: {e}")
@@ -1243,7 +1217,7 @@ def run_commands(ip, password, username=None, commands="", phone_number=None, me
                         result = zte.deletesms(formatted_ids)
                         results[cmd_id] = {"deleted_ids": ids, "status": result}
                     else:
-                        logger.info("No SMS in memory to delete")
+                        logger.debug("No SMS in memory to delete")
                         results[cmd_id] = {"deleted_ids": [], "status": "No SMS"}
                 else:
                     logger.warning("Failed to parse SMS for deletion")
@@ -1280,7 +1254,7 @@ def run_commands(ip, password, username=None, commands="", phone_number=None, me
                     results[cmd_id] = "SMS sending not supported in multi-command mode."
                 else:
                     if phone_number and message:
-                        logger.info(f"Sending SMS to {phone_number} with message: {message}")
+                        logger.info(f"Sending SMS to {redact_phone(phone_number)} with message: {describe_text(message)}")
                         result = zte.sendsms(phone_number, message)
                         results[cmd_id] = result
                     else:

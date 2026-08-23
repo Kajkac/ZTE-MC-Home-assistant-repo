@@ -45,7 +45,7 @@ __all__ = [
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
-    _LOGGER.info("Setting up ZTE Router integration")
+    _LOGGER.debug("Setting up ZTE Router integration")
 
     # Hole die existierenden Coordinators aus hass.data
     coordinators = hass.data[DOMAIN][entry.entry_id]
@@ -170,7 +170,7 @@ class ZTERouterSensor(ZTERouterEntity):
         self.entity_registry_enabled_default = not disabled_by_default
         self._attr_is_diagnostics = key in DIAGNOSTICS_SENSORS
         self._attr_should_poll = False  # Disable default polling
-        _LOGGER.info(f"Initializing sensor {self._name} with key {self._key}")
+        _LOGGER.debug(f"Initializing sensor {self._name} with key {self._key}")
 
     @property
     def name(self):
@@ -213,7 +213,7 @@ class ZTERouterSensor(ZTERouterEntity):
         return None
 
     async def async_update(self):
-        _LOGGER.info(f"Manual update requested for sensor {self._name} at {datetime.now()}")
+        _LOGGER.debug(f"Manual update requested for sensor {self._name} at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     @guard_stale_data
@@ -267,7 +267,7 @@ class ZTERouterSensor(ZTERouterEntity):
                 if raw_state != old_state:
                     self._state = raw_state
                     state_changed = True
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         f"Sensor '{self._name}' updated. Old state: {old_state}, New state: {self._state} (Displayed as: {display_state})"
                     )
                 else:
@@ -279,7 +279,7 @@ class ZTERouterSensor(ZTERouterEntity):
                 if new_state != old_state:
                     self._state = new_state
                     state_changed = True
-                    _LOGGER.info(
+                    _LOGGER.debug(
                         f"Sensor '{self._name}' updated. Old state: {old_state}, New state: {self._state}"
                     )
             else:
@@ -316,7 +316,7 @@ class LastSMSSensor(ZTERouterEntity):
 
         self.entity_registry_enabled_default = not disabled_by_default
         self._attr_should_poll = False  # Disable default polling
-        _LOGGER.info(f"Initializing Last SMS sensor with state: {self._state} (SMS ID)")
+        _LOGGER.debug(f"Initializing Last SMS sensor with state: {self._state} (SMS ID)")
 
         # Parse and format the date attribute
         if "date" in self._attributes:
@@ -361,7 +361,7 @@ class LastSMSSensor(ZTERouterEntity):
         return EntityCategory.DIAGNOSTIC
 
     async def async_update(self):
-        _LOGGER.info(f"Manual update requested for Last SMS sensor at {datetime.now()}")
+        _LOGGER.debug(f"Manual update requested for Last SMS sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     @guard_stale_data
@@ -375,7 +375,7 @@ class LastSMSSensor(ZTERouterEntity):
             self._attributes["content"] = sms_data.get("content", "NO CONTENT")
             if "date" in self._attributes:
                 self._attributes["formatted_date"] = self.format_date(self._attributes["date"])
-            _LOGGER.info(f"Last SMS sensor updated. Old state: {old_state}, New state: {self._state}")
+            _LOGGER.debug(f"Last SMS sensor updated. Old state: {old_state}, New state: {self._state}")
         else:
             _LOGGER.warning("Last SMS sensor: No valid data or update failed. Setting state to Unavailable")
             self._state = "UNKNOWN"
@@ -433,7 +433,7 @@ class MonthlyUsageSensor(ZTERouterEntity):
         self._state = None
         self.entity_registry_enabled_default = True  # Set to True, enabled by default
         self._attr_should_poll = False  # Disable default polling
-        _LOGGER.info(f"Initializing Monthly Usage sensor")
+        _LOGGER.debug(f"Initializing Monthly Usage sensor")
 
     @property
     def name(self):
@@ -474,7 +474,7 @@ class MonthlyUsageSensor(ZTERouterEntity):
         return None
 
     async def async_update(self):
-        _LOGGER.info(f"Manual update requested for Monthly Usage sensor at {datetime.now()}")
+        _LOGGER.debug(f"Manual update requested for Monthly Usage sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     @guard_stale_data
@@ -486,7 +486,7 @@ class MonthlyUsageSensor(ZTERouterEntity):
             monthly_rx_bytes = float(data.get("monthly_rx_bytes", 0) or 0)
             monthly_usage_gb = (monthly_tx_bytes + monthly_rx_bytes) / 1024 / 1024 / 1024
             self._state = round(monthly_usage_gb, 2)
-            _LOGGER.info(f"Monthly Usage sensor updated. Old state: {old_state}, New state: {self._state}")
+            _LOGGER.debug(f"Monthly Usage sensor updated. Old state: {old_state}, New state: {self._state}")
         else:
             _LOGGER.warning(f"Monthly Usage sensor: No valid data or update failed. Setting state to Unavailable")
             self._state = None
@@ -501,7 +501,7 @@ class monthly_tx_gb(ZTERouterEntity):
         self._state = None
         self.entity_registry_enabled_default = True  # Set to True, enabled by default
         self._attr_should_poll = False  # Disable default polling
-        _LOGGER.info(f"Initializing Monthly TX GB sensor")
+        _LOGGER.debug(f"Initializing Monthly TX GB sensor")
 
     @property
     def name(self):
@@ -542,7 +542,7 @@ class monthly_tx_gb(ZTERouterEntity):
         return None
 
     async def async_update(self):
-        _LOGGER.info(f"Manual update requested for Monthly TX GB sensor at {datetime.now()}")
+        _LOGGER.debug(f"Manual update requested for Monthly TX GB sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     @guard_stale_data
@@ -553,7 +553,7 @@ class monthly_tx_gb(ZTERouterEntity):
             monthly_tx_bytes = float(data.get("monthly_tx_bytes", 0) or 0)
             monthly_tx_gb = monthly_tx_bytes / 1024 / 1024 / 1024
             self._state = round(monthly_tx_gb, 2)
-            _LOGGER.info(f"Monthly TX GB sensor updated. Old state: {old_state}, New state: {self._state}")
+            _LOGGER.debug(f"Monthly TX GB sensor updated. Old state: {old_state}, New state: {self._state}")
         else:
             _LOGGER.warning(f"Monthly TX GB sensor: No valid data or update failed. Setting state to Unavailable")
             self._state = None
@@ -568,7 +568,7 @@ class monthly_rx_gb(ZTERouterEntity):
         self._state = None
         self.entity_registry_enabled_default = True  # Set to True, enabled by default
         self._attr_should_poll = False  # Disable default polling
-        _LOGGER.info(f"Initializing Monthly RX GB sensor")
+        _LOGGER.debug(f"Initializing Monthly RX GB sensor")
 
     @property
     def name(self):
@@ -609,7 +609,7 @@ class monthly_rx_gb(ZTERouterEntity):
         return None
 
     async def async_update(self):
-        _LOGGER.info(f"Manual update requested for Monthly RX GB sensor at {datetime.now()}")
+        _LOGGER.debug(f"Manual update requested for Monthly RX GB sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     @guard_stale_data
@@ -620,7 +620,7 @@ class monthly_rx_gb(ZTERouterEntity):
             monthly_rx_bytes = float(data.get("monthly_rx_bytes", 0) or 0)
             monthly_rx_gb = monthly_rx_bytes / 1024 / 1024 / 1024
             self._state = round(monthly_rx_gb, 2)
-            _LOGGER.info(f"Monthly RX GB sensor updated. Old state: {old_state}, New state: {self._state}")
+            _LOGGER.debug(f"Monthly RX GB sensor updated. Old state: {old_state}, New state: {self._state}")
         else:
             _LOGGER.warning(f"Monthly RX GB sensor: No valid data or update failed. Setting state to Unavailable")
             self._state = None
@@ -636,7 +636,7 @@ class DataLeftSensor(ZTERouterEntity):
         self.entity_registry_enabled_default = True
         self._attr_should_poll = False
         self._attr_is_diagnostics = True
-        _LOGGER.info(f"Initializing Data Left sensor")
+        _LOGGER.debug(f"Initializing Data Left sensor")
 
     @property
     def name(self):
@@ -677,7 +677,7 @@ class DataLeftSensor(ZTERouterEntity):
         return EntityCategory.DIAGNOSTIC
 
     async def async_update(self):
-        _LOGGER.info(f"Manual update requested for Data Left sensor at {datetime.now()}")
+        _LOGGER.debug(f"Manual update requested for Data Left sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     @guard_stale_data
@@ -703,7 +703,7 @@ class DataLeftSensor(ZTERouterEntity):
                 data_left = 50 - (usage_gb % 50)
 
             self._state = round(data_left, 2)
-            _LOGGER.info(f"Data Left sensor updated. Old state: {old_state}, New state: {self._state} (Using FLUX: {use_flux})")
+            _LOGGER.debug(f"Data Left sensor updated. Old state: {old_state}, New state: {self._state} (Using FLUX: {use_flux})")
 
         except Exception as e:
             _LOGGER.warning(f"Failed to calculate Data Left: {e}")
@@ -725,7 +725,7 @@ class ConnectionUptimeSensor(ZTERouterEntity):
         self._state = None
         self.entity_registry_enabled_default = True  # Set to True, enabled by default
         self._attr_should_poll = False  # Disable default polling
-        _LOGGER.info(f"Initializing Connection Uptime sensor")
+        _LOGGER.debug(f"Initializing Connection Uptime sensor")
 
     @property
     def name(self):
@@ -766,7 +766,7 @@ class ConnectionUptimeSensor(ZTERouterEntity):
         return EntityCategory.DIAGNOSTIC
 
     async def async_update(self):
-        _LOGGER.info(f"Manual update requested for Connection Uptime sensor at {datetime.now()}")
+        _LOGGER.debug(f"Manual update requested for Connection Uptime sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     @guard_stale_data
@@ -776,7 +776,7 @@ class ConnectionUptimeSensor(ZTERouterEntity):
             realtime_time = float(self.coordinator.data.get("realtime_time", 0) or 0)
             uptime_hours = realtime_time / 3600
             self._state = round(uptime_hours, 2)
-            _LOGGER.info(f"Connection Uptime sensor updated. Old state: {old_state}, New state: {self._state}")
+            _LOGGER.debug(f"Connection Uptime sensor updated. Old state: {old_state}, New state: {self._state}")
         else:
             _LOGGER.warning("Connection Uptime sensor: No valid data or update failed. Setting state to Unavailable")
             self._state = None
@@ -791,7 +791,7 @@ class ConnectedDevicesSensor(ZTERouterEntity):
         self._attributes = {}
         self.entity_registry_enabled_default = not disabled_by_default
         self._attr_should_poll = False
-        _LOGGER.info("Initializing Connected Devices sensor")
+        _LOGGER.debug("Initializing Connected Devices sensor")
 
     @property
     def name(self):
@@ -828,7 +828,7 @@ class ConnectedDevicesSensor(ZTERouterEntity):
         return False  # ✅ This fixes the crash
 
     async def async_update(self):
-        _LOGGER.info(f"Manual update requested for Connected Devices sensor at {datetime.now()}")
+        _LOGGER.debug(f"Manual update requested for Connected Devices sensor at {datetime.now()}")
         await self.coordinator.async_request_refresh()
 
     @guard_stale_data
@@ -852,7 +852,7 @@ class ConnectedDevicesSensor(ZTERouterEntity):
             self._attributes["station_list"] = station_list
             self._attributes["lan_station_list"] = lan_station_list
             self._attributes["all_devices"] = all_devices if isinstance(all_devices, list) else (station_list + lan_station_list)
-            _LOGGER.info(f"Connected Devices updated: {total_devices} devices")
+            _LOGGER.debug(f"Connected Devices updated: {total_devices} devices")
         else:
             _LOGGER.warning("No data available for Connected Devices")
         self.async_write_ha_state()
@@ -866,7 +866,7 @@ class WiFiClientsSensor(ZTERouterEntity):
         self._attributes = {}
         self.entity_registry_enabled_default = not disabled_by_default
         self._attr_should_poll = False
-        _LOGGER.info("Initializing WiFi Clients sensor")
+        _LOGGER.debug("Initializing WiFi Clients sensor")
 
     @property
     def name(self):
@@ -945,7 +945,7 @@ class WiFiClientsSensor(ZTERouterEntity):
             self._attributes["wifi_clients"] = []
             self._attributes["fallback_count_source"] = "wifi_access_sta_num"
 
-        _LOGGER.info(f"WiFi Clients sensor updated: {self._state} devices")
+        _LOGGER.debug(f"WiFi Clients sensor updated: {self._state} devices")
         self.async_write_ha_state()
 
 
@@ -957,7 +957,7 @@ class LANClientsSensor(ZTERouterEntity):
         self._attributes = {}
         self.entity_registry_enabled_default = not disabled_by_default
         self._attr_should_poll = False
-        _LOGGER.info("Initializing LAN Clients sensor")
+        _LOGGER.debug("Initializing LAN Clients sensor")
 
     @property
     def name(self):
@@ -1016,7 +1016,7 @@ class LANClientsSensor(ZTERouterEntity):
 
         self._state = len(formatted_clients)
         self._attributes["lan_clients"] = formatted_clients
-        _LOGGER.info(f"LAN Clients sensor updated: {self._state} devices")
+        _LOGGER.debug(f"LAN Clients sensor updated: {self._state} devices")
         self.async_write_ha_state()
 
 
