@@ -9,6 +9,8 @@ import requests
 import urllib3
 from requests.exceptions import RequestException
 
+from .log_util import redact_phone
+
 ZERO_TOKEN = "0" * 32
 
 # Uses Home Assistant's standard logging (respects the level configured via
@@ -16,7 +18,10 @@ ZERO_TOKEN = "0" * 32
 # Previously this module maintained its own separate DEBUG-forced log file
 # (ultra.log) written directly into the integration's own folder, which grew
 # to 100+ MB in normal use since it ignored HA's configured log level entirely.
-LOGGER = logging.getLogger("homeassistant.components.zte_router.g5_ultra")
+# The name must stay under `custom_components.zte_router`: that is what HA's
+# per-integration debug toggle and `logger:` YAML target for a custom
+# integration, so a `homeassistant.components.*` name escaped both.
+LOGGER = logging.getLogger(__name__)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 CALLS = [
@@ -330,7 +335,7 @@ class G5UltraRouterRunner:
                 continue
 
             try:
-                LOGGER.info("G5 Ultra executing command %s", cmd_id)
+                LOGGER.debug("G5 Ultra executing command %s", cmd_id)
                 if cmd_id in (3, 7, 16) and gather_cache is None:
                     gather_cache = self.gather_all_data()
 
@@ -400,13 +405,13 @@ class G5UltraRouterRunner:
         if not token:
             raise RuntimeError("Unable to retrieve session token during login")
         self.session_token = token
-        LOGGER.info("Obtained new G5 Ultra session token")
+        LOGGER.debug("Obtained new G5 Ultra session token")
         return token
 
     def gather_all_data(self) -> Dict[str, Any]:
         token = self._ensure_token()
         results: Dict[str, Any] = {}
-        LOGGER.info("Starting G5 Ultra gather_all_data sequence")
+        LOGGER.debug("Starting G5 Ultra gather_all_data sequence")
         sms_capacity_flat: Dict[str, Any] = {}
         for name, module, func, params in CALLS:
             try:
@@ -448,7 +453,7 @@ class G5UltraRouterRunner:
         if flux_fields:
             results["summary"].update({k: v for k, v in flux_fields.items() if v is not None})
             results["flux_flat"] = flux_fields
-        LOGGER.info(
+        LOGGER.debug(
             "Completed gather_all_data: summary keys=%s wireless=%s lan=%s",
             list((results.get("summary") or {}).keys()),
             len(results.get("wireless_clients") or []),
@@ -1150,7 +1155,7 @@ class G5UltraRouterRunner:
         )
         result = self._safe_result(response)
         command_status = self.wait_for_sms_command(token, sms_cmd=4)
-        LOGGER.info("Sent SMS to %s with status %s", number, command_status.get("status"))
+        LOGGER.info("Sent SMS to %s with status %s", redact_phone(number), command_status.get("status"))
         return {"request": result, "command_status": command_status}
 
     def list_sms_messages(
@@ -1180,10 +1185,9 @@ class G5UltraRouterRunner:
         raw_messages = data.get("messages", []) if isinstance(data, dict) else []
         formatted = [format_sms_record(item) for item in raw_messages or []]
         LOGGER.debug(
-            "Listed SMS messages page=%s count=%s raw_preview=%s",
+            "Listed SMS messages page=%s count=%s",
             page,
             len(formatted),
-            repr(raw_messages[:1]) if raw_messages else "[]",
         )
         return {
             "page": page,

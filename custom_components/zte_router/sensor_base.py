@@ -28,7 +28,7 @@ class ZTERouterEntity(RestoreEntity, Entity):
     """Base class for ZTE Router sensors to ensure consistent MRO."""
 
     async def async_added_to_hass(self):
-        _LOGGER.info(f"Entity {self.name} added to hass at {datetime.now()}")
+        _LOGGER.debug(f"Entity {self.name} added to hass at {datetime.now()}")
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
         if last_state is not None:

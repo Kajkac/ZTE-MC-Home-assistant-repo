@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/github/license/Kajkac/ZTE-MC-Home-assistant-repo)](LICENSE)
 [![Installs](https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=active%20installs&suffix=%20&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.zte_router.total)](https://analytics.home-assistant.io/custom_integrations.json)
 
-[Install via HACS](#-installation) · [Supported devices](#-supported-devices) · [Beta versions](#-beta-versions) · [Services](#-services) · [Known issues](#-known-issues)
+[Install via HACS](#-installation) · [Supported devices](#-supported-devices) · [Beta versions](#-beta-versions) · [Services](#-services) · [Logging](#-logging) · [Known issues](#-known-issues)
 
 </div>
 
@@ -140,11 +140,27 @@ Advanced/debug service, **G5 Ultra only** — invokes an arbitrary ubus module/m
 
 Not needed for normal use.
 
+## 📝 Logging
+
+The integration logs through Home Assistant and writes no log files of its own, so `logger:` and the **Enable debug logging** button on the integration page control everything it emits.
+
+Routine polling is logged at `debug`; `info` is reserved for actions you triggered (sending an SMS, rebooting, toggling a switch). To go quieter still, or to trace requests for a bug report:
+
+```yaml
+logger:
+  logs:
+    custom_components.zte_router: warning  # or: debug
+```
+
+> [!NOTE]
+> Versions up to 1.0.55 wrote their own `mc.log` / `ultra.log` next to the integration, at `debug` level and with broken rotation ([#40](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/issues/40)). They're no longer created, but existing files aren't removed — delete any leftovers from `config/custom_components/zte_router/`.
+
+Session tokens, auth hashes, phone numbers and SMS bodies are redacted, but `debug` still contains your router's IP and full API responses — skim before pasting into an issue.
+
 ## 🐞 Known Issues
 
 - Some sensors may briefly show `unknown` until the next refresh
 - SMS parsing can behave differently across router models/firmware
-- A few log warnings are still being cleaned up — the integration is fully usable, but not yet fully quiet in the logs
 - Found something else? [Open an issue](https://github.com/Kajkac/ZTE-MC-Home-assistant-repo/issues) — reports drive what gets fixed next
 
 ## 🤝 Contributing
