@@ -1,8 +1,9 @@
-"""Guards for the logging behaviour fixed in #40.
+"""Guards on how much this integration writes to the log.
 
 Home Assistant logs at INFO by default and rotates only its own
 home-assistant.log, so a polling integration that logs progress at INFO -- or
-that installs a file handler of its own -- writes to disk on every cycle.
+that installs a file handler of its own, or that lets a library retry a request
+it already knows will fail -- writes to disk on every cycle.
 
 Stdlib only (no Home Assistant, no router libraries) so CI can run it.
 """
@@ -21,6 +22,14 @@ from log_util import describe_text, redact, redact_phone  # noqa: E402
 def integration_modules():
     for path in sorted(INTEGRATION.glob("*.py")):
         yield path, ast.parse(path.read_text(encoding="utf-8"))
+
+
+def function_def(module, name):
+    _, tree = next(p for p in integration_modules() if p[0].name == module)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            return node
+    raise AssertionError(f"{name}() not found in {module}")
 
 
 def is_main_guard(test):
@@ -95,6 +104,34 @@ class LoggingPolicyTest(unittest.TestCase):
             [],
             "addHandler() outside an `if __name__ == '__main__'` guard: " + ", ".join(offenders),
         )
+
+
+class ProtocolProbeTest(unittest.TestCase):
+    """urllib3 logs a WARNING per retry, under its own logger name, so retrying a
+    scheme the modem refuses floods home-assistant.log once per poll -- and the
+    user's log level for this integration cannot mute it."""
+
+    def test_the_scheme_probe_does_not_retry(self):
+        retries = [
+            kw.value
+            for node in ast.walk(function_def("mc.py", "try_set_protocol"))
+            if isinstance(node, ast.Call)
+            for kw in node.keywords
+            if kw.arg == "retries"
+        ]
+        self.assertTrue(retries, "the scheme probe must pass retries= explicitly")
+        for value in retries:
+            self.assertIsInstance(value, ast.Constant)
+            self.assertIs(value.value, False)
+
+    def test_red_crypto_does_not_hardcode_a_scheme(self):
+        """It must follow what the probe found, not re-probe https on an http-only modem."""
+        literals = [
+            node.value
+            for node in ast.walk(function_def("mc.py", "_setup_red_crypto"))
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        ]
+        self.assertEqual([lit for lit in literals if lit.startswith("https://")], [])
 
 
 if __name__ == "__main__":
